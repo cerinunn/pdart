@@ -1,0 +1,209 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Splices the records (chains) together.
+
+:copyright:
+    The PDART Development Team & Ceri Nunn
+:license:
+    GNU Lesser General Public License, Version 3
+    (https://www.gnu.org/copyleft/lesser.html)
+"""
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+from future.builtins import *  # NOQA
+from datetime import timedelta
+import os
+import io
+import gzip
+import glob
+import numpy as np
+import numpy.ma as ma
+import logging, logging.handlers
+import csv
+import fnmatch
+import shutil
+
+from obspy.core.utcdatetime import UTCDateTime
+from obspy.core import Stream, Trace, Stats, read
+from urllib.request import Request, build_opener, HTTPError
+
+from pdart_apollo.chains import _calc_match_samp_frame, _samples_to_shift
+from pdart_apollo.util import stream_select
+
+global DELTA
+DELTA = 0.15094
+SECONDS_PER_DAY = 3600.0 * 24.0
+INVALID = -99999
+ABSOLUTE_ADJUST_TIME = 2.
+
+def call_splice_chains(
+    stations=['S11','S12','S14','S15','S16'],
+    chain_dir='.',
+    splice_dir='.',
+    start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
+    end_time=UTCDateTime('1977-09-30T:21:00.000000Z'),
+    read_gzip=True,
+    write_gzip=False):
+    '''
+    Calls splice_chains()
+    Remember that the absolute timing depends on the previous stream,
+    so run call_splice_chains in date order.
+    '''
+
+    log_filename = 'logs/splice.log'
+    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
+    logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
+
+    for station in stations:
+
+        # check that the overall directory exists
+        if not os.path.exists(splice_dir):
+            msg = ("The directory {} doesn't exist".format(splice_dir))
+            raise IOError(msg)
+        else:
+            # make the subdirectory with the station name
+            splice_dir_station =  os.path.join(splice_dir, station)
+            if not os.path.exists(splice_dir_station):
+                os.makedirs(splice_dir_station)
+
+    # run for each station
+    for station in stations:
+
+        starttime0=None
+        framecount0=None
+        adjust0=None
+
+        chain_dir_station =  os.path.join(chain_dir, station)
+        splice_dir_station =  os.path.join(splice_dir, station)
+
+        time_interval = timedelta(hours=3)
+        start = start_time
+        while start < end_time:
+
+            chain_filename = '%s_%s.MINISEED' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
+            if read_gzip:
+                chain_filename = '%s.gz' % (chain_filename)
+            splice_filename = '%s_%s.MINISEED' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
+            if write_gzip:
+                splice_filename = '%s.gz' % (splice_filename)
+
+            chain_dir_filename = os.path.join(chain_dir_station, chain_filename)
+            splice_dir_filename = os.path.join(splice_dir_station, splice_filename)
+
+            # read in the file
+            stream = read(chain_dir_filename)
+            # select for just this station, (not necessary, but just in case)
+            stream = stream.select(station=station)
+
+            if len(stream) > 0:
+
+                # splice the chains for the period
+                return_stream, starttime0, framecount0, adjust0  = splice_chains(stream=stream,
+                  starttime0=starttime0, framecount0=framecount0, adjust0=adjust0)
+                # it returns starttime0, framecount0, adjust0, so that we
+                # can run correctly for the next period
+
+                if len(return_stream) > 0:
+                    # split the streams in order to save them
+                    return_stream = return_stream.split()
+                    # save the streams
+                    return_stream.write(splice_dir_filename, 'MSEED')
+                    if write_gzip:
+                        with open(chain_dir_filename, 'rb') as f_in, gzip.open(splice_dir_filename, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                        os.unlink(chain_dir_filename)
+
+            # increment the time interval
+            start += time_interval
+
+def splice_chains(stream, starttime0=None, framecount0=None, adjust0=None):
+    '''
+    Splice the records (chains) together.
+    Remember that the absolute timing depends on the previous stream,
+    so run call_splice_chains in date order.
+    '''
+    log_filename = 'logs/splice.log'
+    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
+    logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
+
+    logging.info('A')
+
+    if adjust0 is None:
+        if starttime0 is not None or framecount0 is not None:
+            msg = 'If adjust0 is not set, starttime0 and framecount0 must also be set.'
+            logging.warning(msg)
+            exit()
+
+    # quick check to make sure only one station
+    station = stream[0].stats.station
+    if len(stream) != len(stream.select(station=station)):
+        raise ValueError("More than one station in the stream")
+
+    # begin by selecting the frame traces, and sorting by starttime
+    frm_stream = stream.select(channel='AFR')
+    frm_stream = frm_stream.sort(keys=['starttime'])
+
+    for fs in frm_stream:
+        # if starttime0, framecount0 and adjust0
+        # have not already been set, we set them from the earliest
+        # trace in the stream
+        if adjust0 is None:
+            starttime0 = fs.stats.starttime
+            framecount0 = fs.data[0]
+            adjust0 = 0
+            continue
+
+        # find the starttime and framecount of the current trace
+        starttime1 = fs.stats.starttime
+        endtime1 = fs.stats.endtime
+        framecount1 = fs.data[0]
+
+        # adjust the starttime
+        adjust_starttime0 = starttime0 - adjust0
+
+        # estimate the sample number of the current trace, assuming
+        # it continues from the successful trace
+        sample_idx = _calc_match_samp_frame(starttime1, adjust_starttime0, framecount0, framecount1, obs_delta0=DELTA)
+
+        valid_chain = False
+
+        # sample_idx is None when it is invalid
+        if sample_idx is not None:
+            # estimate the new starttime for the current trace
+            est_starttime1 = starttime0 + (sample_idx * DELTA)
+            # check that the adjust time is not getting too large
+            adjust1 = est_starttime1 - starttime1
+            if abs(adjust1 - adjust0) < ABSOLUTE_ADJUST_TIME:
+                valid_chain = True
+
+        # update the startimes for the 'checked' type traces which match the other details
+        st_update = stream_select(stream,network=fs.stats.network, station=fs.stats.station,
+                  location=fs.stats.location,starttime=fs.stats.starttime,endtime=fs.stats.endtime)
+        # st_update = select_checked_stream(st_update)
+
+        # loop through the matching traces
+        for i, tr in enumerate(st_update):
+            # traces are either updated or removed from the original stream
+            if valid_chain:
+                if i==0:
+                    # record the change in the log for the first trace only
+                    msg = 'adjust_time:{}, for station: {}, location: {}, starttime: {}, endtime: {}'.format(adjust1,
+                      tr.stats.station, tr.stats.location, starttime1, endtime1 )
+                    logging.debug(msg)
+                    # update starttime0, framecount0, adjust0 with details from this trace
+                    starttime0 = est_starttime1
+                    framecount0 = framecount1
+                    adjust0 = adjust1
+                # adjust trace starttime
+                tr.stats.starttime = est_starttime1
+            else:
+                # throw the trace away
+                if i==0:
+                    msg = 'Remvoing this trace: for station: {}, location: {}, , starttime: {}, endtime: {}'.format(
+                      tr.stats.station, tr.stats.location,  tr.stats.starttime, tr.stats.endtime )
+                    logging.debug(msg)
+                # remove the stream from the trace we passed in to the method
+                stream.remove(tr)
+
+    return stream, starttime0, framecount0, adjust0
