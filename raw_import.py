@@ -83,7 +83,7 @@ def call_raw_import(
                 raw_dir_station = os.path.join(raw_dir, station)
                 stream_file = os.path.join(raw_dir_station, stream_file)
                 gzip_file = os.path.join(raw_dir_station, gzip_file)
-                stream.write(stream_file, 'MSEED')
+                station_stream.write(stream_file, 'MSEED')
                 if write_gzip:
                     with open(stream_file, 'rb') as f_in, gzip.open(gzip_file, 'wb') as f_out:
                         shutil.copyfileobj(f_in, f_out)
