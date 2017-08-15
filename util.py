@@ -103,3 +103,31 @@ def stream_select(stream, network=None, station=None, location=None, channel=Non
 
         new_stream.append(trace)
     return new_stream
+
+def trace_eq(trace1, trace2):
+    """
+    Based on __eq__() method in obspy.trace for equality between traces.
+
+    Implements rich comparison of Trace objects for "==" operator.
+
+    Traces are the same, if both their data and stats are the same.
+    Can also check for equality in masked traces.
+    """
+    # check if trace1 is a Trace
+    if not isinstance(trace1, Trace):
+        return False
+    # check if trace2 is a Trace
+    if not isinstance(trace2, Trace):
+        return False
+    # comparison of Stats objects is supported by underlying AttribDict
+    if not trace1.stats == trace2.stats:
+        return False
+    # if the array is masked, check for equality of masked array
+    if isinstance(trace1.data,np.ma.MaskedArray) and isinstance(trace2.data,np.ma.MaskedArray):
+        if not ma.allequal(trace1.data, trace2.data, fill_value=True):
+            return False
+    # comparison of ndarrays is supported by NumPy
+        if not np.array_equal(trace1.data, trace2.data):
+            return False
+
+    return True
