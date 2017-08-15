@@ -35,7 +35,7 @@ import shutil
 
 from obspy.core.utcdatetime import UTCDateTime
 from obspy.core import Stream, Trace, Stats, read
-from pdart.util import stream_select
+from pdart.util import stream_select, trace_eq
 
 global DELTA
 DELTA = 0.15094
@@ -112,12 +112,13 @@ def call_build_chains(
             # select for just this station, (not necessary, but just in case)
             stream = stream.select(station=station)
 
+
             if len(stream) > 0:
 
                 # build the chains (for this station)
                 stream1 = build_chains(stream=stream)
                 # get rid of any short traces that overlap with other
-                # stream
+                # streams
                 stream2 = discard_short_traces(stream1)
 
                 if len(stream2) > 0:
@@ -125,11 +126,11 @@ def call_build_chains(
                     # are gaps
                     stream2 = stream2.split()
                     stream2.write(chain_dir_filename, 'MSEED')
+
                     if write_gzip:
                         with open(chain_dir_filename, 'rb') as f_in, gzip.open(gzip_chain_dir_filename, 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
                         os.unlink(chain_dir_filename)
-
 
             # increment the time interval
             start += time_interval
@@ -203,7 +204,8 @@ def build_chains(stream):
                     consecutive_invalid = 0
                     # if the framecount is out of range, continue
                     if framecount1 < 0 or framecount1 > 89.75:
-                        print('Exit: framecount invalid ', start_pointer)
+                        msg('framecount invalid ', start_pointer)
+                        logging.debug(msg)
                         break
 
                 else: # records where i < 0
@@ -218,11 +220,11 @@ def build_chains(stream):
                         if i < 4:
                             # unable to make a chain of 4, so break out
                             valid_chain = False
-                            print('Exit: invalid frame, less than 4 ', start_pointer)
+                            msg = 'invalid frame, less than 4 {}'.format(start_pointer)
+                            logging.debug(msg)
                             break
                         else:
                             # we just ignore it
-                            print('Ignoring')
                             continue
                     # if the frame range is valid
                     else:
@@ -240,7 +242,14 @@ def build_chains(stream):
                             if pointer_array[pointer-1]+1 != pointer_array[pointer]:
                                 consecutive_invalid += 1
                             else:
-                                consecutive_invalid = 0
+                                # check for indices which are lower than the
+                                # previous one
+                                if pointer_array[pointer-1] >= pointer_array[pointer]:
+                                    consecutive_invalid += 1
+                                    pointer_array[pointer] = INVALID
+                                else:
+                                    consecutive_invalid = 0
+
                         else:
                             consecutive_invalid += 1
 
@@ -383,44 +392,48 @@ def discard_short_traces(stream):
     # sort a stream (from the timing channel) with the number of samples
     sorted_stream = stream.select(channel='ATT').sort(keys=['npts'])
 
-    # outer loop of traces, sorted number of samples
-    for tr in sorted_stream:
-        # if the trace is short
-        if tr.stats.npts < MIN_SAMPLE_LENGTH:
-            start_timestamp = tr.data[0]
-            end_timestamp = tr.data[-1]
-            # inner loop of traces, to check against
-            for tr1 in sorted_stream:
-                remove_flag = False
-                # if the inner and outer trace are the same, do nothing
-                if tr == tr1:
+    # if there is more than one trace in sorted_stream, see if there are any
+    # traces to discard.
+    if len(sorted_stream) > 1:
+
+        # outer loop of traces, sorted number of samples
+        for tr in sorted_stream:
+            # if the trace is short
+            if tr.stats.npts < MIN_SAMPLE_LENGTH:
+                start_timestamp = tr.data[0]
+                end_timestamp = tr.data[-1]
+                # inner loop of traces, to check against
+                for tr1 in sorted_stream:
+                    remove_flag = False
+                    # if the inner and outer trace are the same, do nothing
+                    if trace_eq(tr,tr1):
+                        continue
+                    start_timestamp_check = tr1.data[0]
+                    end_timestamp_check = tr1.data[-1]
+                    # check the short trace overlaps both ends of another trace
+                    if ( start_timestamp > start_timestamp_check and
+                      end_timestamp < end_timestamp_check ):
+                        remove_flag = True
+                        msg = ('Removing short trace: ', tr)
+                        logging.debug(msg)
+                        stream_short = stream_select(sorted_stream,network=tr.stats.network, station=tr.stats.station,
+                          location=tr.stats.location,starttime=tr.stats.starttime,endtime=tr.stats.endtime)
+                        for tr2 in stream_short:
+                            # remove from the return_stream
+                            return_stream.remove(tr2)
+
+                        if remove_flag:
+                            # break the inner loop (and continue the outer one)
+                            break
+
+                if remove_flag:
+                    # if we removed the trace, we can move to the next short sample
                     continue
-                start_timestamp_check = tr1.data[0]
-                end_timestamp_check = tr1.data[-1]
-                # check the short trace overlaps both ends of another trace
-                if ( start_timestamp > start_timestamp_check and
-                  end_timestamp < end_timestamp_check ):
-                    remove_flag = True
-                    msg = ('Removing short trace: ', tr)
-                    logging.debug(msg)
-                    stream_short = select_stream(stream,network=tr.stats.network, station=tr.stats.station,
-                      location=tr.stats.location,starttime=tr.stats.starttime,endtime=tr.stats.endtime)
-                    for tr2 in stream_short:
-                        # remove from the sorted_stream
-                        return_stream.remove(tr2)
 
-                    if remove_flag:
-                        # break the inner loop (and continue the outer one)
-                        break
-
-            if remove_flag:
-                # if we removed the trace, we can move to the next short sample
-                continue
-
-        # the stream is ordered by trace length, so we can stop execution
-        # when the traces are too long
-        else:
-            break
+            # the stream is ordered by trace length, so we can stop execution
+            # when the traces are too long
+            else:
+                break
 
     return return_stream
 
