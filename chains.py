@@ -389,7 +389,7 @@ def discard_short_traces(stream):
     return_stream = stream.copy()
 
     # sort a stream (from the timing channel) with the number of samples
-    sorted_stream = stream.select(channel='ATT').sort(keys=['npts'])
+    sorted_stream = return_stream.select(channel='ATT').sort(keys=['npts'])
 
     # if there is more than one trace in sorted_stream, see if there are any
     # traces to discard.
