@@ -64,6 +64,7 @@ def call_build_chains(
 
     log_filename = 'logs/build_chains.log'
     logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
+    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
 
     for station in stations:
 
@@ -149,19 +150,12 @@ def build_chains(stream):
     if len(stream) != len(stream.select(station=station)):
         raise ValueError("More than one station in the stream")
 
-    # (arrays should be 3 and a bit hours, because that is designed to
-    # be the maximum size)
-    n = int(3.05*60*60*(1/DELTA))
-    pointer_array = np.full(n, INVALID, 'int32')
-
     # TODO only need 3 if running SPZ
     # original_data = np.full((n,3), INVALID, 'int32')
 
     # begin by selecting the raw trace, and sorting by starttime
     FR_stream = stream.select(channel='_FR')
     FR_stream = FR_stream.sort(keys=['starttime'])
-
-    idx_diff = 0
 
     return_stream = Stream()
 
@@ -185,8 +179,9 @@ def build_chains(stream):
 
         while start_pointer < len_data:
             # loop through data from start pointer to the end
+            msg = ('Valid chain: {} Start pointer{} {}'.format(valid_chain, start_pointer, fs.data[start_pointer:]))
+            logging.debug(msg)
             for i, framecount1 in enumerate(fs.data[start_pointer:]):
-
                 # pointer is the CURRENT index
                 pointer = start_pointer + i
 
@@ -194,17 +189,20 @@ def build_chains(stream):
 
                 # first step - look for a short chain assuming the first one in the trace is ok
                 if i == 0:
-                    msg = ('i = 0, {} {} {}'.format(i, start_pointer, framecount1))
+                    msg = ('i = 0, {} {} {} {}'.format(i, start_pointer, framecount1, UTCDateTime(match_timestamp1)))
                     logging.debug(msg)
                     chain_framecount0 = fs.data[start_pointer]
                     chain_timestamp0 = TT_stream[0].data[start_pointer]
+                    chain_pointer0 = start_pointer
+                    # make a pointer_array
+                    n = fs.stats.npts
                     pointer_array = np.full(n, INVALID, 'int32')
                     pointer_array[start_pointer] = start_pointer
                     valid_chain = False
                     consecutive_invalid = 0
                     # if the framecount is out of range, continue
                     if framecount1 < 0 or framecount1 > 89.75:
-                        msg('framecount invalid ', start_pointer)
+                        msg = 'invalid framecount'
                         logging.debug(msg)
                         break
 
@@ -220,7 +218,7 @@ def build_chains(stream):
                         if i < 4:
                             # unable to make a chain of 4, so break out
                             valid_chain = False
-                            msg = 'invalid frame, less than 4 {}'.format(start_pointer)
+                            msg = 'invalid framecount, less than 4 {}'.format(start_pointer)
                             logging.debug(msg)
                             break
                         else:
@@ -230,28 +228,28 @@ def build_chains(stream):
                     else:
                         # check for the correct sample index from the framecount
                         # and timestamp
-                        sample_idx = _calc_match_samp_frame(match_timestamp1, chain_timestamp0, chain_framecount0, framecount1, obs_delta0=DELTA)
+                        sample_diff = _calc_match(match_timestamp1, chain_timestamp0, chain_framecount0, framecount1, obs_delta0=DELTA)
 
-                        if sample_idx is not None:
-                            pointer_array[pointer] = sample_idx + start_pointer
+                        if sample_diff is not None:
+                            pointer_array[pointer] = sample_diff + chain_pointer0
                             # last_idx = pointer_array[pointer-1]
-                            msg = ('Sample, i, framecount and pointer array, ', sample_idx, i, framecount1, str(pointer_array[0:7]))
+                            msg = ('Sample, i, framecount and pointer array, ', sample_diff, i, framecount1, str(pointer_array[0:7]))
                             logging.debug(msg)
 
                             # check for consecutive values within the frame
                             if pointer_array[pointer-1]+1 != pointer_array[pointer]:
                                 consecutive_invalid += 1
                             else:
-                                # check for indices which are lower than the
-                                # previous one
-                                if pointer_array[pointer-1] >= pointer_array[pointer]:
-                                    consecutive_invalid += 1
-                                    pointer_array[pointer] = INVALID
-                                else:
-                                    consecutive_invalid = 0
+                                consecutive_invalid = 0
 
+                            # the current one is valid, so update the
+                            # timestamp and framecount
+                            chain_timestamp0 = match_timestamp1
+                            chain_framecount0 = framecount1
+                            chain_pointer0 += sample_diff
                         else:
                             consecutive_invalid += 1
+
 
                         # if i is 3 and the framecounts have been consecutive
                         # then mark the chain as invalid
@@ -260,8 +258,8 @@ def build_chains(stream):
 
                         if i < 4 and consecutive_invalid != 0:
                             # unable to make a chain of 4, so break out
-                            msg = ('Unable to make a chain of 4, so break out {} {} {}'.format(sample_idx, pointer, framecount1))
-                            logging.info(msg)
+                            msg = ('Unable to make a chain of 4, so break out {} {} {}'.format(sample_diff, pointer, framecount1))
+                            logging.debug(msg)
                             break
 
                         # break the chain if more than 3 framecounts have been
@@ -281,7 +279,7 @@ def build_chains(stream):
                 logging.debug(msg)
             else:
                 start_pointer = start_pointer + 1
-                msg = ('Start pointer after invalid {}'.format(start_pointer))
+                msg = ('Start pointer after invalid {} {}'.format(start_pointer, len_data))
                 logging.debug(msg)
 
     return return_stream
@@ -363,12 +361,13 @@ def _calc_match_samp_frame(starttime1, starttime0, framecount0, framecount1, obs
             # make some more checks
             if sample_idx != 0:
                 observed_delta = tim_diff / sample_idx
-                obs_delta_percent = round(100.*(DELTA-observed_delta)/DELTA,3)
+                # obs_delta_percent = round(100.*(DELTA-observed_delta)/DELTA,3)
+                obs_delta_percent = 100.*(DELTA-observed_delta)/DELTA
                 msg = 'Average sampling interval:{0} Percent error from nominal interval:{1}%'.format(observed_delta, obs_delta_percent)
                 logging.info(msg)
                 if abs(obs_delta_percent) > 1:
                     msg = 'Reject automatically'
-                    logging.info(msg)
+                    logging.debug(msg)
                     sample_idx = None
             else:
                 sample_idx = None
@@ -453,6 +452,8 @@ def _reconstruct_streams(stream, pointer_array):
 
     """
 
+    re_stream = stream.copy()
+
     # find the first valid pointer
     for first_pointer in pointer_array:
         if first_pointer != INVALID:
@@ -467,11 +468,11 @@ def _reconstruct_streams(stream, pointer_array):
     n = last_pointer - first_pointer + 1
 
     # find the starttime
-    for tr in stream.select(channel='_TT'):
+    for tr in re_stream.select(channel='_TT'):
         starttime0 = UTCDateTime(tr.data[first_pointer])
 
     # look through the whole stream
-    for tr in stream:
+    for tr in re_stream:
         # change to the new channel name
         if tr.stats.channel == '_FR':
             tr.stats.channel = 'AFR'
@@ -515,4 +516,47 @@ def _reconstruct_streams(stream, pointer_array):
         # update the starttime of the trace
         tr.stats.starttime = starttime0
 
-    return stream, last_pointer
+    return re_stream, last_pointer
+
+def _calc_match(starttime1, starttime0, framecount0, framecount1, obs_delta0):
+    """
+    Calculate the number of indices to move the sample on.
+
+    framecount0 and starttime0 should be the last successful matches.
+
+    """
+    tim_diff = starttime1 - starttime0
+    if tim_diff < 0 :
+        raise ValueError('Time difference is negative.')
+    sample_idx = tim_diff/obs_delta0
+
+    # there are 90*4 = 360 samples per block
+    # we can ignore whole blocks so just use the modulo operator
+    part_block_samples = sample_idx % 360
+    # round to nearest 0.25
+    part_block_samples = (round(part_block_samples*4)/4)
+    # change to framecounts (4 samples per frame number)
+    part_block = part_block_samples/4
+    # calculate the correct framecount for the time of the
+    # new trace
+    est_framecount1 = framecount0 + part_block
+    # if the number is greater than 89.75, take 90 from it to get the correct number
+    if est_framecount1 > 89.75:
+        est_framecount1 = est_framecount1 - 90
+
+    sample_idx = round(sample_idx)
+    if sample_idx != 0 and framecount1 == est_framecount1:
+    # make some more checks
+        observed_delta = tim_diff / sample_idx
+        # obs_delta_percent = round(100.*(DELTA-observed_delta)/DELTA,3)
+        obs_delta_percent = 100.*(DELTA-observed_delta)/DELTA
+        msg = 'Sampling interval:{0} Percent error from nominal interval:{1}%'.format(observed_delta, obs_delta_percent)
+        logging.debug(msg)
+        if abs(obs_delta_percent) > 1:
+            msg = 'Reject automatically:{0} Percent error from nominal interval:{1}%'.format(observed_delta, obs_delta_percent)
+            logging.debug(msg)
+            sample_idx = None
+    else:
+        sample_idx = None
+
+    return sample_idx
