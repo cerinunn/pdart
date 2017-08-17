@@ -71,7 +71,7 @@ def plot_from_stream(
 
         if len(stream) > 0:
             if plot_type == 'dayplot':
-                stream.plot(plot_type ='dayplot',time_offset=0,show_y_UTC_label=False,
+                stream.plot(type ='dayplot',time_offset=0,show_y_UTC_label=False,
                   vertical_scaling_range=300)
             else:
                 stream.plot(size=(1200,600),method='full')
@@ -90,6 +90,7 @@ def plot_from_file(
     Read in files between the start and end times and plot.
     Calls plot_from_stream()
     '''
+
 
     if plot_type == 'dayplot':
         time_interval = timedelta(hours=24)
@@ -114,9 +115,18 @@ def plot_from_file(
                 stream_filename = '%s.gz' % (stream_filename)
             stream_filename = os.path.join(file_dir_station, stream_filename)
 
-            print(stream_filename)
-            # exit()
-            stream = read(stream_filename)
+            # read in the file
+            try:
+                stream = read(stream_filename)
+                print(stream_filename)
+            except FileNotFoundError:
+                msg = 'view.py cannot find file: {}'.format(stream_filename)
+                print(msg)
+                logging.info(msg)
+                # increment the time interval
+                start += time_interval
+                continue
+
 
 
             # select for this station
