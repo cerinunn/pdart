@@ -28,8 +28,8 @@ from obspy.core.utcdatetime import UTCDateTime
 from obspy.core import Stream, Trace, Stats, read
 from urllib.request import Request, build_opener, HTTPError
 
-from pdart_apollo.chains import _calc_match_samp_frame, _samples_to_shift
-from pdart_apollo.util import stream_select
+from pdart.chains import _samples_to_shift
+from pdart.util import stream_select, trace_eq
 
 global DELTA
 DELTA = 0.15094
@@ -44,7 +44,9 @@ def call_splice_chains(
     start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
     end_time=UTCDateTime('1977-09-30T:21:00.000000Z'),
     read_gzip=True,
-    write_gzip=False):
+    write_gzip=True,
+    manual_remove_file=None):
+
     '''
     Calls splice_chains()
     Remember that the absolute timing depends on the previous stream,
@@ -52,8 +54,8 @@ def call_splice_chains(
     '''
 
     log_filename = 'logs/splice.log'
-    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
-    logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
+    logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
+    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
 
     for station in stations:
 
@@ -66,6 +68,14 @@ def call_splice_chains(
             splice_dir_station =  os.path.join(splice_dir, station)
             if not os.path.exists(splice_dir_station):
                 os.makedirs(splice_dir_station)
+
+        manual_remove_list = []
+        if manual_remove_file is not None:
+            with open(manual_remove_file, 'rt') as fh:
+                for line in fh:
+                    if line[0:19] != 'INFO:root:########:':
+                        line = line.replace('INFO:root:######:','')
+                        manual_remove_list.append(line)
 
     # run for each station
     for station in stations:
@@ -81,18 +91,36 @@ def call_splice_chains(
         start = start_time
         while start < end_time:
 
-            chain_filename = '%s_%s.MINISEED' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
+            chain_filename = '%s_%s*.MINISEED' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
             if read_gzip:
-                chain_filename = '%s.gz' % (chain_filename)
+                chain_filename = '%s*.gz' % (chain_filename)
+
             splice_filename = '%s_%s.MINISEED' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
+            splice_dir_filename = os.path.join(splice_dir_station,
+              splice_filename)
             if write_gzip:
-                splice_filename = '%s.gz' % (splice_filename)
+                gzip_splice_filename = '%s.gz' % (splice_filename)
+                gzip_splice_dir_filename = os.path.join(splice_dir_station,
+                  gzip_splice_filename)
+
 
             chain_dir_filename = os.path.join(chain_dir_station, chain_filename)
-            splice_dir_filename = os.path.join(splice_dir_station, splice_filename)
+
+            msg = '########: {}'.format(chain_dir_filename)
+            logging.info(msg)
+
+            # check that the file pattern exists
+            if not glob.glob(chain_dir_filename):
+                msg = 'splice.py cannot find file: {}'.format(chain_dir_filename)
+                print(msg)
+                logging.info(msg)
+                # increment the time interval
+                start += time_interval
+                continue
 
             # read in the file
             stream = read(chain_dir_filename)
+
             # select for just this station, (not necessary, but just in case)
             stream = stream.select(station=station)
 
@@ -100,6 +128,7 @@ def call_splice_chains(
 
                 # splice the chains for the period
                 return_stream, starttime0, framecount0, adjust0  = splice_chains(stream=stream,
+                  manual_remove_list=manual_remove_list,
                   starttime0=starttime0, framecount0=framecount0, adjust0=adjust0)
                 # it returns starttime0, framecount0, adjust0, so that we
                 # can run correctly for the next period
@@ -110,24 +139,29 @@ def call_splice_chains(
                     # save the streams
                     return_stream.write(splice_dir_filename, 'MSEED')
                     if write_gzip:
-                        with open(chain_dir_filename, 'rb') as f_in, gzip.open(splice_dir_filename, 'wb') as f_out:
+                        with open(splice_dir_filename, 'rb') as f_in, gzip.open(gzip_splice_dir_filename, 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
-                        os.unlink(chain_dir_filename)
+                        os.unlink(splice_dir_filename)
+                else:
+                    msg = 'No spliced records for {}.'.format(chain_dir_filename)
+                    logging.info(msg)
+
+            else:
+                msg = 'No records found for {}.'.format(chain_dir_filename)
+                logging.info(msg)
 
             # increment the time interval
             start += time_interval
 
-def splice_chains(stream, starttime0=None, framecount0=None, adjust0=None):
+def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=None, adjust0=None):
     '''
     Splice the records (chains) together.
     Remember that the absolute timing depends on the previous stream,
     so run call_splice_chains in date order.
     '''
     log_filename = 'logs/splice.log'
-    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
-    logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
-
-    logging.info('A')
+    logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
+    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
 
     if adjust0 is None:
         if starttime0 is not None or framecount0 is not None:
@@ -144,7 +178,31 @@ def splice_chains(stream, starttime0=None, framecount0=None, adjust0=None):
     frm_stream = stream.select(channel='AFR')
     frm_stream = frm_stream.sort(keys=['starttime'])
 
+    # if we need anything to remove, remove it here
+    if manual_remove_list is not None:
+        frm_stream = manual_remove(frm_stream,manual_remove_list)
+
+    return_stream = Stream()
+
+    # for i, fs in enumerate(frm_stream):
+    #     fs.plot()
+    #     if i > 4:
+    #         exit()
+    # exit()
+
+    # for ix, fs in enumerate(frm_stream):
+    #     if ix > 4:
+    #         exit()
     for fs in frm_stream:
+
+        if type(fs.data) == ma.MaskedArray:
+            percent_invalid = ma.count_masked(fs.data)/len(fs.data)*100.
+        else:
+            percent_invalid = 0
+
+        msg = ('######: {} {} {} {} {} {} {}%'.format(fs.stats.network, fs.stats.station, fs.stats.location, fs.stats.starttime, fs.stats.endtime, fs.stats.npts, round(percent_invalid,2)))
+        logging.info(msg)
+
         # if starttime0, framecount0 and adjust0
         # have not already been set, we set them from the earliest
         # trace in the stream
@@ -174,8 +232,12 @@ def splice_chains(stream, starttime0=None, framecount0=None, adjust0=None):
             est_starttime1 = starttime0 + (sample_idx * DELTA)
             # check that the adjust time is not getting too large
             adjust1 = est_starttime1 - starttime1
+            msg = '{} {} {} {} {}'.format(est_starttime1,starttime1, adjust1, adjust0, abs(adjust1 - adjust0))
+            logging.debug(msg)
             if abs(adjust1 - adjust0) < ABSOLUTE_ADJUST_TIME:
                 valid_chain = True
+        # else:
+        #     logging.debug('None')
 
         # update the startimes for the 'checked' type traces which match the other details
         st_update = stream_select(stream,network=fs.stats.network, station=fs.stats.station,
@@ -204,6 +266,65 @@ def splice_chains(stream, starttime0=None, framecount0=None, adjust0=None):
                       tr.stats.station, tr.stats.location,  tr.stats.starttime, tr.stats.endtime )
                     logging.debug(msg)
                 # remove the stream from the trace we passed in to the method
-                stream.remove(tr)
+                st_update.remove(tr)
+        return_stream += st_update
 
-    return stream, starttime0, framecount0, adjust0
+    return return_stream, starttime0, framecount0, adjust0
+
+def _calc_match_samp_frame(starttime1, starttime0, framecount0, framecount1, obs_delta0):
+    """
+    Calculate the estimated index number and frame number.
+    The estimate is based on matching the timestamp of the trace we
+    are editing (starttime1), with the starttime and framecount of the first one in
+    the group. The method calculates the sample index and the framecount.
+    """
+    tim_diff = starttime1 - starttime0
+    if tim_diff < 0 :
+        raise ValueError('Time difference is negative.')
+    sample_idx = int(round(tim_diff/obs_delta0))
+
+    # there are 90*4 = 360 samples per block
+    # we can ignore whole blocks so just use the modulo operator
+    part_block_samples = sample_idx % 360
+    # round to nearest 0.25
+    part_block_samples = (round(part_block_samples*4)/4)
+
+    # change to framecounts (4 samples per frame number)
+    part_block = part_block_samples/4
+    # calculate the correct framecount for the time of the
+    # new trace
+    est_framecount1 = framecount0 + part_block
+
+    # if the number is greater than 89.75, take 90 from it to get the correct number
+    if est_framecount1 > 89.75:
+        est_framecount1 = est_framecount1 - 90
+
+    idx_diff = 0
+
+    if framecount1 != est_framecount1:
+        # if the trace needs shifting sample numbers, do it here:
+        idx_diff = _samples_to_shift(framecount1, est_framecount1)
+
+        if abs(idx_diff) < 12:
+            sample_idx = sample_idx + idx_diff
+        else:
+            sample_idx = None
+            msg = 'idx_diff == {} - reject automatically'.format(idx_diff)
+            logging.info(msg)
+
+    msg = 'sample_idx {} idx_diff {} framecount1 {} est_framecount1 {}'.format(sample_idx, idx_diff, framecount1, est_framecount1)
+    logging.debug(msg)
+    return sample_idx
+
+
+def manual_remove(stream, manual_remove_list):
+    for line in manual_remove_list:
+        (network, station, location, starttime, endtime, npts, percent_invalid) = line.split()
+        starttime = UTCDateTime(starttime)
+        endtime = UTCDateTime(endtime)
+
+        match = stream_select(stream,network=network,station=station,location=location,starttime=starttime,endtime=endtime)
+        for mat in match:
+            stream.remove(mat)
+
+    return stream

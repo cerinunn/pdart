@@ -37,12 +37,18 @@ from obspy.core.utcdatetime import UTCDateTime
 from obspy.core import Stream, Trace, Stats, read
 from pdart.util import stream_select, trace_eq
 
+import time
+
+
 global DELTA
 DELTA = 0.15094
 SECONDS_PER_DAY = 3600.0 * 24.0
 INVALID = -99999
 ABSOLUTE_ADJUST_TIME = 2.
 MIN_SAMPLE_LENGTH = 361
+
+
+
 
 def call_build_chains(
     stations=['S11','S12','S14','S15','S16'],
@@ -88,22 +94,34 @@ def call_build_chains(
         start = start_time
         while start < end_time:
 
-            # work out the filenames
-            stream_filename = '%s_%s.MINISEED' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
+            # work out the base filenames
+            # stream_filename = '%s_%s.MINISEED' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
+            # if read_gzip:
+            #     stream_filename = '%s.gz' % (stream_filename)
+            #
+            # gzip_chain_filename = '%s.gz' % (chain_filename)
+            # raw_dir_filename = os.path.join(raw_dir_station, stream_filename)
+            # chain_dir_filename = os.path.join(chain_dir_station, chain_filename)
+            # gzip_chain_dir_filename = os.path.join(chain_dir_station,
+            #   gzip_chain_filename)
+
+            raw_filename = '%s_%s' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
+            raw_filename = os.path.join(raw_dir_station, raw_filename)
             if read_gzip:
-                stream_filename = '%s.gz' % (stream_filename)
-            chain_filename = '%s_%s.MINISEED' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
-            gzip_chain_filename = '%s.gz' % (chain_filename)
-            raw_dir_filename = os.path.join(raw_dir_station, stream_filename)
-            chain_dir_filename = os.path.join(chain_dir_station, chain_filename)
-            gzip_chain_dir_filename = os.path.join(chain_dir_station,
-              gzip_chain_filename)
+                raw_filename = '%s.MINISEED.gz' % (raw_filename)
+            else:
+                raw_filename = '%s.MINISEED' % (raw_filename)
+
+
+            base_chain_filename = '%s_%s' % (start.strftime("%Y-%m-%dT%H:%M:%S"), station)
+            base_chain_filename = os.path.join(chain_dir_station, base_chain_filename)
+
 
             # read in the raw SEED file
             try:
-                stream = read(raw_dir_filename)
+                stream = read(raw_filename)
             except FileNotFoundError:
-                msg = 'chains.py cannot find file: {}'.format(raw_dir_filename)
+                msg = 'chains.py cannot find file: {}'.format(raw_filename)
                 print(msg)
                 logging.info(msg)
                 # increment the time interval
@@ -113,25 +131,45 @@ def call_build_chains(
             # select for just this station, (not necessary, but just in case)
             stream = stream.select(station=station)
 
+            # delete existing chains
+            chain_filename = '%s%s' % (base_chain_filename, '*.MINISEED*')
+            for i in glob.glob(chain_filename):
+              os.unlink (i)
 
             if len(stream) > 0:
 
                 # build the chains (for this station)
-                stream1 = build_chains(stream=stream)
-                # get rid of any short traces that overlap with other
-                # streams
-                stream2 = discard_short_traces(stream1)
+                stream2 = build_chains(stream=stream)
 
-                if len(stream2) > 0:
-                    # split if the streams have masked data (because there
-                    # are gaps
-                    stream2 = stream2.split()
-                    stream2.write(chain_dir_filename, 'MSEED')
+                stream3 = stream2.select(channel='ATT')
 
+                for i, tr in enumerate(stream3):
+
+                    chain_filename = '%s_%s.%s' % (base_chain_filename, i, 'MINISEED')
                     if write_gzip:
-                        with open(chain_dir_filename, 'rb') as f_in, gzip.open(gzip_chain_dir_filename, 'wb') as f_out:
+                        chain_filename_gzip = '%s.gz' % (chain_filename)
+
+                    match = stream_select(stream2,network=tr.stats.network, station=tr.stats.station,
+                      location=tr.stats.location,starttime=tr.stats.starttime,endtime=tr.stats.endtime)
+
+                    match = match.split()
+                    match.write(chain_filename, 'MSEED')
+                    if write_gzip:
+                        with open(chain_filename, 'rb') as f_in, gzip.open(chain_filename_gzip, 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
-                        os.unlink(chain_dir_filename)
+                        os.unlink(chain_filename)
+
+
+                # if len(stream2) > 0:
+                #     # split if the streams have masked data (because there
+                #     # are gaps
+                #     stream2 = stream2.split()
+                #     stream2.write(chain_dir_filename, 'MSEED')
+                #
+                #     if write_gzip:
+                #         with open(chain_dir_filename, 'rb') as f_in, gzip.open(gzip_chain_dir_filename, 'wb') as f_out:
+                #             shutil.copyfileobj(f_in, f_out)
+                #         os.unlink(chain_dir_filename)
 
             # increment the time interval
             start += time_interval
@@ -152,6 +190,11 @@ def build_chains(stream):
 
     # TODO only need 3 if running SPZ
     # original_data = np.full((n,3), INVALID, 'int32')
+
+    # get rid of any short traces that overlap with other
+    # streams
+
+    stream = discard_short_traces(stream)
 
     # begin by selecting the raw trace, and sorting by starttime
     FR_stream = stream.select(channel='_FR')
@@ -179,9 +222,9 @@ def build_chains(stream):
 
         while start_pointer < len_data:
             # loop through data from start pointer to the end
-            msg = ('Valid chain: {} Start pointer{} {}'.format(valid_chain, start_pointer, fs.data[start_pointer:]))
-            logging.debug(msg)
+
             for i, framecount1 in enumerate(fs.data[start_pointer:]):
+
                 # pointer is the CURRENT index
                 pointer = start_pointer + i
 
@@ -228,6 +271,8 @@ def build_chains(stream):
                     else:
                         # check for the correct sample index from the framecount
                         # and timestamp
+                        msg = ('Framecount {}'.format(framecount1))
+                        logging.debug(msg)
                         sample_diff = _calc_match(match_timestamp1, chain_timestamp0, chain_framecount0, framecount1, obs_delta0=DELTA)
 
                         if sample_diff is not None:
@@ -327,114 +372,9 @@ def _samples_to_shift(framecount1, est_framecount1):
 
     return idx_diff
 
-def _calc_match_samp_frame(starttime1, starttime0, framecount0, framecount1, obs_delta0):
-    """
-    Calculate the estimated index number and frame number.
-    The estimate is based on matching the timestamp of the trace we
-    are editing (starttime1), with the starttime and framecount of the first one in
-    the group. The method calculates the sample index and the framecount.
-    """
-    tim_diff = starttime1 - starttime0
-    if tim_diff < 0 :
-        raise ValueError('Time difference is negative.')
-    sample_idx = int(round(tim_diff/obs_delta0))
-
-    # there are 90*4 = 360 samples per block
-    # we can ignore whole blocks so just use the modulo operator
-    part_block_samples = sample_idx % 360
-    # round to nearest 0.25
-    part_block_samples = (round(part_block_samples*4)/4)
-    # change to framecounts (4 samples per frame number)
-    part_block = part_block_samples/4
-    # calculate the correct framecount for the time of the
-    # new trace
-    est_framecount1 = framecount0 + part_block
-    # if the number is greater than 89.75, take 90 from it to get the correct number
-    if est_framecount1 > 89.75:
-        est_framecount1 = est_framecount1 - 90
-
-    if framecount1 != est_framecount1:
-        # if the trace needs shifting sample numbers, do it here:
-        idx_diff = _samples_to_shift(framecount1, est_framecount1)
-        if abs(idx_diff) < 12:
-            sample_idx = sample_idx + idx_diff
-            # make some more checks
-            if sample_idx != 0:
-                observed_delta = tim_diff / sample_idx
-                # obs_delta_percent = round(100.*(DELTA-observed_delta)/DELTA,3)
-                obs_delta_percent = 100.*(DELTA-observed_delta)/DELTA
-                msg = 'Average sampling interval:{0} Percent error from nominal interval:{1}%'.format(observed_delta, obs_delta_percent)
-                logging.info(msg)
-                if abs(obs_delta_percent) > 1:
-                    msg = 'Reject automatically'
-                    logging.debug(msg)
-                    sample_idx = None
-            else:
-                sample_idx = None
-        else:
-            sample_idx = None
-
-    return sample_idx
 
 
 
-def discard_short_traces(stream):
-    """
-    Discard short traces which overlap with longer traces.
-    Short traces are often quite poor quality - but sometimes occur when
-    a longer trace exists. If so, they can be safely discarded.
-    """
-
-    # copy the original stream
-    return_stream = stream.copy()
-
-    # sort a stream (from the timing channel) with the number of samples
-    sorted_stream = return_stream.select(channel='ATT').sort(keys=['npts'])
-
-    # if there is more than one trace in sorted_stream, see if there are any
-    # traces to discard.
-    if len(sorted_stream) > 1:
-
-        # outer loop of traces, sorted number of samples
-        for tr in sorted_stream:
-            # if the trace is short
-            if tr.stats.npts < MIN_SAMPLE_LENGTH:
-                start_timestamp = tr.data[0]
-                end_timestamp = tr.data[-1]
-                # inner loop of traces, to check against
-                for tr1 in sorted_stream:
-                    remove_flag = False
-                    # if the inner and outer trace are the same, do nothing
-                    if trace_eq(tr,tr1):
-                        continue
-                    start_timestamp_check = tr1.data[0]
-                    end_timestamp_check = tr1.data[-1]
-                    # check the short trace overlaps both ends of another trace
-                    if ( start_timestamp > start_timestamp_check and
-                      end_timestamp < end_timestamp_check ):
-                        remove_flag = True
-                        msg = ('Removing short trace: ', tr)
-                        logging.debug(msg)
-                        stream_short = stream_select(sorted_stream,network=tr.stats.network, station=tr.stats.station,
-                          location=tr.stats.location,starttime=tr.stats.starttime,endtime=tr.stats.endtime)
-                        for tr2 in stream_short:
-                            # remove from the return_stream
-                            return_stream.remove(tr2)
-
-                        if remove_flag:
-                            # break the inner loop (and continue the outer one)
-                            break
-
-                if remove_flag:
-                    # if we removed the trace, we can move to the next short sample
-                    continue
-
-            # the stream is ordered by trace length, so we can stop execution
-            # when the traces are too long
-            else:
-                break
-
-    return return_stream
 
 def _reconstruct_streams(stream, pointer_array):
     """
@@ -552,7 +492,9 @@ def _calc_match(starttime1, starttime0, framecount0, framecount1, obs_delta0):
         obs_delta_percent = 100.*(DELTA-observed_delta)/DELTA
         msg = 'Sampling interval:{0} Percent error from nominal interval:{1}%'.format(observed_delta, obs_delta_percent)
         logging.debug(msg)
-        if abs(obs_delta_percent) > 1:
+        # up to a 10% error (we make a new chain if data is not consecutive -
+        # so this only applies to chains that are OK.
+        if abs(obs_delta_percent) > 10:
             msg = 'Reject automatically:{0} Percent error from nominal interval:{1}%'.format(observed_delta, obs_delta_percent)
             logging.debug(msg)
             sample_idx = None
@@ -560,3 +502,62 @@ def _calc_match(starttime1, starttime0, framecount0, framecount1, obs_delta0):
         sample_idx = None
 
     return sample_idx
+
+def discard_short_traces(stream):
+    """
+    Discard short traces which overlap with longer traces.
+    Short traces are often quite poor quality - but sometimes occur when
+    a longer trace exists. If so, they can be safely discarded.
+    """
+
+    # copy the original stream
+    return_stream = stream.copy()
+
+
+    # sort a stream (from the timing channel) with the number of samples
+    sorted_stream = return_stream.select(channel='_TT').sort(keys=['npts'])
+
+    # if there is more than one trace in sorted_stream, see if there are any
+    # traces to discard.
+    if len(sorted_stream) > 1:
+
+        # outer loop of traces, sorted number of samples
+        for tr in sorted_stream:
+            # if the trace is short
+            if tr.stats.npts < MIN_SAMPLE_LENGTH:
+                start_timestamp = tr.data[0]
+                end_timestamp = tr.data[-1]
+                # inner loop of traces, to check against
+                for tr1 in sorted_stream:
+                    remove_flag = False
+                    # if the inner and outer trace are the same, do nothing
+                    if trace_eq(tr,tr1):
+                        continue
+                    start_timestamp_check = tr1.data[0]
+                    end_timestamp_check = tr1.data[-1]
+                    # check the short trace overlaps both ends of another trace
+                    if ( start_timestamp > start_timestamp_check and
+                      end_timestamp < end_timestamp_check ):
+                        remove_flag = True
+                        msg = ('Removing short trace: ', tr)
+                        logging.debug(msg)
+                        stream_short = stream_select(stream,network=tr.stats.network, station=tr.stats.station,
+                          location=tr.stats.location,starttime=tr.stats.starttime,endtime=tr.stats.endtime)
+                        for tr2 in stream_short:
+                            # remove from the return_stream
+                            return_stream.remove(tr2)
+
+                        if remove_flag:
+                            # break the inner loop (and continue the outer one)
+                            break
+
+                if remove_flag:
+                    # if we removed the trace, we can move to the next short sample
+                    continue
+
+            # the stream is ordered by trace length, so we can stop execution
+            # when the traces are too long
+            else:
+                break
+
+    return return_stream
