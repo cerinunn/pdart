@@ -45,7 +45,8 @@ def call_splice_chains(
     end_time=UTCDateTime('1977-09-30T:21:00.000000Z'),
     read_gzip=True,
     write_gzip=True,
-    manual_remove_file=None):
+    manual_remove_file=None,
+    reset=True):
 
     '''
     Calls splice_chains()
@@ -124,12 +125,22 @@ def call_splice_chains(
             # select for just this station, (not necessary, but just in case)
             stream = stream.select(station=station)
 
+            if reset:
+                # use this when you want to check each file separately
+                starttime0=None
+                framecount0=None
+                adjust0=None
+
             if len(stream) > 0:
 
                 # splice the chains for the period
                 return_stream, starttime0, framecount0, adjust0  = splice_chains(stream=stream,
                   manual_remove_list=manual_remove_list,
                   starttime0=starttime0, framecount0=framecount0, adjust0=adjust0)
+
+                msg = "{} starttime0=UTCDateTime('{}'); framecount0={}; adjust0={}".format(chain_dir_filename, str(starttime0), framecount0, adjust0)
+                logging.info(msg)
+
                 # it returns starttime0, framecount0, adjust0, so that we
                 # can run correctly for the next period
 
@@ -210,6 +221,10 @@ def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=
             starttime0 = fs.stats.starttime
             framecount0 = fs.data[0]
             adjust0 = 0
+            # find the matching traces
+            match = stream_select(stream,network=fs.stats.network, station=fs.stats.station,
+              location=fs.stats.location,starttime=fs.stats.starttime,endtime=fs.stats.endtime)
+            return_stream += match
             continue
 
         # find the starttime and framecount of the current trace
@@ -239,10 +254,9 @@ def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=
         # else:
         #     logging.debug('None')
 
-        # update the startimes for the 'checked' type traces which match the other details
+        # update the startimes for the traces which match the other details
         st_update = stream_select(stream,network=fs.stats.network, station=fs.stats.station,
                   location=fs.stats.location,starttime=fs.stats.starttime,endtime=fs.stats.endtime)
-        # st_update = select_checked_stream(st_update)
 
         # loop through the matching traces
         for i, tr in enumerate(st_update):
