@@ -283,6 +283,23 @@ def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=
                 st_update.remove(tr)
         return_stream += st_update
 
+
+    if len(return_stream) > 0:
+        # calculate the length and write to the log file
+        length_stream = return_stream.select(channel='ATT')
+        length_stream = length_stream.sort(keys=['starttime'])
+        length_stream2 = length_stream.copy()
+        length_stream2 = length_stream2.sort(keys=['endtime'], reverse=True)
+        elapsed_time = length_stream2[0].stats.endtime - length_stream[0].stats.starttime
+        elapsed_timestamps = length_stream2[0].data[-1] - length_stream[0].data[0]
+        obs_delta = elapsed_timestamps / ((elapsed_time)/DELTA)
+        msg = ('elapsed_time: {} elapsed_timestamps: {} obs_delta: {}'.format(round(elapsed_time,3), round(elapsed_timestamps,3),obs_delta))
+        if elapsed_timestamps > 10801. or elapsed_timestamps < 10799:
+            logging.warning(msg)
+        else:
+            logging.info(msg)
+
+
     return return_stream, starttime0, framecount0, adjust0
 
 def _calc_match_samp_frame(starttime1, starttime0, framecount0, framecount1, obs_delta0):
