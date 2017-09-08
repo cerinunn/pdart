@@ -89,6 +89,8 @@ def call_raw_import(
                         shutil.copyfileobj(f_in, f_out)
                     os.unlink(stream_file)
 
+                print(station_stream)
+
         # increment the time interval
         start += time_interval
 
@@ -107,6 +109,7 @@ def raw_import(gzip_filename):
     :return: A ObsPy Stream object.
 
     """
+
     # read the gzipped csv file
     with gzip.open(gzip_filename, 'rt') as fh:
         # read file

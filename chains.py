@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
+THIS CODE IS OBSELETE.
+
 Make 'chains' by checking the framecount and inserting gaps.
 Where the framecounts are consecutive and the timestamps are within
 a tolerance, the method will make a chain.
@@ -154,6 +156,7 @@ def call_build_chains(
 
                     match = match.split()
                     match.write(chain_filename, 'MSEED')
+                    # print(match)
                     if write_gzip:
                         with open(chain_filename, 'rb') as f_in, gzip.open(chain_filename_gzip, 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
@@ -527,6 +530,8 @@ def discard_short_traces(stream):
             if tr.stats.npts < MIN_SAMPLE_LENGTH:
                 start_timestamp = tr.data[0]
                 end_timestamp = tr.data[-1]
+                # print(UTCDateTime(start_timestamp), UTCDateTime(end_timestamp))
+                # exit()
                 # inner loop of traces, to check against
                 for tr1 in sorted_stream:
                     remove_flag = False
@@ -535,11 +540,13 @@ def discard_short_traces(stream):
                         continue
                     start_timestamp_check = tr1.data[0]
                     end_timestamp_check = tr1.data[-1]
+                    # print(UTCDateTime(start_timestamp_check), UTCDateTime(end_timestamp_check))
                     # check the short trace overlaps both ends of another trace
                     if ( start_timestamp > start_timestamp_check and
                       end_timestamp < end_timestamp_check ):
                         remove_flag = True
                         msg = ('Removing short trace: ', tr)
+                        # print(msg)
                         logging.debug(msg)
                         stream_short = stream_select(stream,network=tr.stats.network, station=tr.stats.station,
                           location=tr.stats.location,starttime=tr.stats.starttime,endtime=tr.stats.endtime)

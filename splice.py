@@ -35,7 +35,8 @@ global DELTA
 DELTA = 0.15094
 SECONDS_PER_DAY = 3600.0 * 24.0
 INVALID = -99999
-ABSOLUTE_ADJUST_TIME = 2.
+ABSOLUTE_ADJUST_TIME = 3.
+PERCENT_DELTA_ERROR = 0.006
 
 def call_splice_chains(
     stations=['S11','S12','S14','S15','S16'],
@@ -46,7 +47,7 @@ def call_splice_chains(
     read_gzip=True,
     write_gzip=True,
     manual_remove_file=None,
-    reset=True):
+    reset=False):
 
     '''
     Calls splice_chains()
@@ -55,8 +56,8 @@ def call_splice_chains(
     '''
 
     log_filename = 'logs/splice.log'
-    logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
-    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
+    # logging.basicConfig(filename=log_filename, filemode='w', level=logging.INFO)
+    logging.basicConfig(filename=log_filename, filemode='w', level=logging.DEBUG)
 
     for station in stations:
 
@@ -164,7 +165,8 @@ def call_splice_chains(
             # increment the time interval
             start += time_interval
 
-def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=None, adjust0=None):
+def splice_chains(stream, manual_remove_list=None, starttime0=None,
+  framecount0=None, adjust0=None, obs_delta0=None):
     '''
     Splice the records (chains) together.
     Remember that the absolute timing depends on the previous stream,
@@ -206,13 +208,33 @@ def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=
     #         exit()
     for fs in frm_stream:
 
-        if type(fs.data) == ma.MaskedArray:
-            percent_invalid = ma.count_masked(fs.data)/len(fs.data)*100.
-        else:
-            percent_invalid = 0
+        # if type(fs.data) == ma.MaskedArray:
+        #     percent_invalid = ma.count_masked(fs.data)/len(fs.data)*100.
+        # else:
+        #     percent_invalid = 0
 
-        msg = ('######: {} {} {} {} {} {} {}%'.format(fs.stats.network, fs.stats.station, fs.stats.location, fs.stats.starttime, fs.stats.endtime, fs.stats.npts, round(percent_invalid,2)))
-        logging.info(msg)
+        # msg = ('######: {} {} {} {} {} {}'.format(fs.stats.network, fs.stats.station, fs.stats.location, fs.stats.starttime, fs.stats.endtime, fs.stats.npts))
+        # logging.info(msg)
+        # msg = ('######: {} {} {} {} {} {} {}%'.format(fs.stats.network, fs.stats.station, fs.stats.location, fs.stats.starttime, fs.stats.endtime, fs.stats.npts, round(percent_invalid,2)))
+        # logging.info(msg)
+
+
+        # is the chain valid?
+        st_ATT = stream_select(stream,network=fs.stats.network, station=fs.stats.station,
+                  location=fs.stats.location,starttime=fs.stats.starttime,endtime=fs.stats.endtime, channel='ATT')
+        tim1 = st_ATT[0].data[0]
+        tim2 = st_ATT[0].data[-1]
+        obs_delta1 = (tim2 - tim1)/(st_ATT[0].stats.npts-1)
+
+        # check if error is out of range
+        percent_delta_error = abs(((obs_delta1 - DELTA)/DELTA)*100)
+
+        if percent_delta_error > PERCENT_DELTA_ERROR:
+            msg = 'obs_delta1 == {} {} {} {} - reject automatically'.format(fs.id, fs.stats.starttime, fs.stats.endtime, obs_delta1)
+            logging.info(msg)
+            print(msg)
+            continue
+
 
         # if starttime0, framecount0 and adjust0
         # have not already been set, we set them from the earliest
@@ -221,6 +243,7 @@ def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=
             starttime0 = fs.stats.starttime
             framecount0 = fs.data[0]
             adjust0 = 0
+            obs_delta0 = DELTA
             # find the matching traces
             match = stream_select(stream,network=fs.stats.network, station=fs.stats.station,
               location=fs.stats.location,starttime=fs.stats.starttime,endtime=fs.stats.endtime)
@@ -237,9 +260,8 @@ def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=
 
         # estimate the sample number of the current trace, assuming
         # it continues from the successful trace
-        sample_idx = _calc_match_samp_frame(starttime1, adjust_starttime0, framecount0, framecount1, obs_delta0=DELTA)
-
-        valid_chain = False
+        sample_idx = _calc_match_samp_frame(starttime1, adjust_starttime0, framecount0, framecount1, obs_delta0=obs_delta0, obs_delta1=obs_delta1)
+        # valid_chain = False
 
         # sample_idx is None when it is invalid
         if sample_idx is not None:
@@ -247,42 +269,41 @@ def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=
             est_starttime1 = starttime0 + (sample_idx * DELTA)
             # check that the adjust time is not getting too large
             adjust1 = est_starttime1 - starttime1
-            msg = '{} {} {} {} {}'.format(est_starttime1,starttime1, adjust1, adjust0, abs(adjust1 - adjust0))
+            msg = 'Est starttime1: {} Starttime1: {} Adjust1: {} Adjust0: {} Adjust diff: {}'.format(est_starttime1,starttime1, adjust1, adjust0, abs(adjust1 - adjust0))
             logging.debug(msg)
             if abs(adjust1 - adjust0) < ABSOLUTE_ADJUST_TIME:
-                valid_chain = True
-        # else:
-        #     logging.debug('None')
+                # valid_chain = True
 
-        # update the startimes for the traces which match the other details
-        st_update = stream_select(stream,network=fs.stats.network, station=fs.stats.station,
-                  location=fs.stats.location,starttime=fs.stats.starttime,endtime=fs.stats.endtime)
+                # record the change in the log for the first trace only
+                msg = 'adjust_time:{}, for station: {}, location: {}, starttime: {}, endtime: {}'.format(adjust1,
+                  fs.stats.station, fs.stats.location, starttime1, endtime1 )
+                logging.debug(msg)
 
-        # loop through the matching traces
-        for i, tr in enumerate(st_update):
-            # traces are either updated or removed from the original stream
-            if valid_chain:
-                if i==0:
-                    # record the change in the log for the first trace only
-                    msg = 'adjust_time:{}, for station: {}, location: {}, starttime: {}, endtime: {}'.format(adjust1,
-                      tr.stats.station, tr.stats.location, starttime1, endtime1 )
-                    logging.debug(msg)
-                    # update starttime0, framecount0, adjust0 with details from this trace
-                    starttime0 = est_starttime1
-                    framecount0 = framecount1
-                    adjust0 = adjust1
-                # adjust trace starttime
-                tr.stats.starttime = est_starttime1
-            else:
-                # throw the trace away
-                if i==0:
-                    msg = 'Remvoing this trace: for station: {}, location: {}, , starttime: {}, endtime: {}'.format(
-                      tr.stats.station, tr.stats.location,  tr.stats.starttime, tr.stats.endtime )
-                    logging.debug(msg)
-                # remove the stream from the trace we passed in to the method
-                st_update.remove(tr)
-        return_stream += st_update
+                # update the startimes for the traces which match the other details
+                st_update = stream_select(stream,network=fs.stats.network, station=fs.stats.station,
+                          location=fs.stats.location,starttime=fs.stats.starttime,endtime=fs.stats.endtime)
 
+                # loop through the matching traces
+                for tr in st_update:
+                    # traces are either updated or removed from the original stream
+                    # if valid_chain:
+                    # if i==0:
+
+                    # adjust trace starttime
+                    tr.stats.starttime = est_starttime1
+                    # else:
+                    #     # throw the trace away
+                    #     if i==0:
+                    #         msg = 'Remvoing this trace: for station: {}, location: {}, , starttime: {}, endtime: {}'.format(
+                    #           tr.stats.station, tr.stats.location,  tr.stats.starttime, tr.stats.endtime )
+                    #         logging.debug(msg)
+                    #     # remove the stream from the trace we passed in to the method
+                    #     st_update.remove(tr)
+                return_stream += st_update
+                # update starttime0, framecount0, adjust0 with details from this trace
+                starttime0 = est_starttime1
+                framecount0 = framecount1
+                adjust0 = adjust1
 
     if len(return_stream) > 0:
         # calculate the length and write to the log file
@@ -299,10 +320,9 @@ def splice_chains(stream, manual_remove_list=None, starttime0=None, framecount0=
         else:
             logging.info(msg)
 
-
     return return_stream, starttime0, framecount0, adjust0
 
-def _calc_match_samp_frame(starttime1, starttime0, framecount0, framecount1, obs_delta0):
+def _calc_match_samp_frame(starttime1, starttime0, framecount0, framecount1, obs_delta0, obs_delta1):
     """
     Calculate the estimated index number and frame number.
     The estimate is based on matching the timestamp of the trace we
@@ -312,7 +332,10 @@ def _calc_match_samp_frame(starttime1, starttime0, framecount0, framecount1, obs
     tim_diff = starttime1 - starttime0
     if tim_diff < 0 :
         raise ValueError('Time difference is negative.')
-    sample_idx = int(round(tim_diff/obs_delta0))
+
+    # calculate the average of the 2 deltas
+    obs_delta = (obs_delta0 + obs_delta1)/2
+    sample_idx = int(round(tim_diff/obs_delta))
 
     # there are 90*4 = 360 samples per block
     # we can ignore whole blocks so just use the modulo operator
@@ -336,8 +359,10 @@ def _calc_match_samp_frame(starttime1, starttime0, framecount0, framecount1, obs
         # if the trace needs shifting sample numbers, do it here:
         idx_diff = _samples_to_shift(framecount1, est_framecount1)
 
-        if abs(idx_diff) < 12:
+        if abs(idx_diff) < 18:
             sample_idx = sample_idx + idx_diff
+            msg = 'idx_diff == {} - warning - idx_diff is high '.format(idx_diff)
+            logging.info(msg)
         else:
             sample_idx = None
             msg = 'idx_diff == {} - reject automatically'.format(idx_diff)
