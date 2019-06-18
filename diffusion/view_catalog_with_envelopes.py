@@ -26,6 +26,9 @@ import numpy as np
 from matplotlib.dates import date2num
 import math
 
+from obspy.geodetics.base import gps2dist_azimuth
+MOON_RADIUS = 1737 * 1000.
+MOON_FLATTENING = 1/825
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -920,6 +923,8 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
   dir_type='pdart_dir',pre_filt_main=None,pre_filt_env=None,output='VEL',
   smooth_periods=10,time_before=600,time_after=3600,plot_type='with_seismogram'): 
 
+    
+
     file_out = file.replace('.xml', '_out.xml')
 
     # read the response file
@@ -931,7 +936,10 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
     #         print(station)
     # print(inv[0][0][0].response)
     # exit()
+    # just using Station 12 at the moment 
     station_code = 'S12'
+    latitude = [-3.01084]
+    longitude = [-23.42456]
     
     catalog = read_events(file)
     quit = False
@@ -944,9 +952,19 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
     for i, ev in enumerate(catalog[start_no:]):
             starttime = None
             endtime = None
+            for origin in ev.origins:
+                distance, azimuth_A_B, azimuth_B_A =  gps2dist_azimuth(
+                  origin.latitude, origin.longitude, latitude[0], longitude[0], MOON_RADIUS, MOON_FLATTENING)
+                distance = distance/1000.
+                print(ev.event_type)
+                for desc in ev.event_descriptions:
+                    print(desc.text)
+                print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
+            
+
             picks = ev.picks
             for pick in picks:
-                print(i+start_no, pick.time)
+                print('Event in catalog number {}, Pick Time {}, Phase hint {}'.format(i+start_no, pick.time, pick.phase_hint))
                 # continue
                 if not starttime:
                     starttime = pick.time
