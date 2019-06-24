@@ -77,7 +77,8 @@ View the catalog files
 """
 
 
-find_dir(top_level_dir,year,station,channel):
+
+def find_dir(top_level_dir,year,station,channel):
     return os.path.join(top_level_dir, str(year), 'XA', station, channel)
 
 def find_processed_dir(top_level_dir,year,station):
@@ -1148,3 +1149,4 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
 # unit = m/(s*s)
 # genericAmplitude = number
         
+
