@@ -37,6 +37,12 @@ import matplotlib.pyplot as plt
 # from matplotlib import rcParams
 # rcParams.update({'figure.autolayout': True})
 
+STATION_LIST = ['S12','S14','S15','S16']
+LATITUDES = [-3.01084,-3.6445,26.13407,-8.97577]
+LONGITUDES = [-23.42456,-17.47753,3.62981,15.49649]
+MH1_AZIMUTHS = [180,0,0,334.5]
+MH2_AZIMUTHS = [270,90,90,64.5]
+
 ampl_dict =	{
   "purple": 3e-9,
   "pink": 6e-9,
@@ -71,8 +77,7 @@ View the catalog files
 """
 
 
-
-def find_dir(top_level_dir,year,station,channel):
+find_dir(top_level_dir,year,station,channel):
     return os.path.join(top_level_dir, str(year), 'XA', station, channel)
 
 def find_processed_dir(top_level_dir,year,station):
@@ -95,6 +100,7 @@ def find_seismogram(top_level_dir,starttime,endtime,
                 str(starttime.year), starttime.julday)
         filename = os.path.join(dir,filename)
         try:
+            # print('Filename ', filename)
             stream += read(filename)
         except Exception as e:
             print(str(e))
@@ -128,10 +134,12 @@ def find_seismogram(top_level_dir,starttime,endtime,
 
     return stream
 
+# is this not returning the amended trace properly???
 def remove_response(trace, inventory=None, output="VEL", water_level=60,
                     pre_filt=None, zero_mean=True, taper=True,
                     taper_fraction=0.05, plot=False, fig=None, 
                     return_spectra=False, **kwargs):
+
     """
     Deconvolve instrument response. Based on a method on trace.
     It adds units, which are obviously dependent on the problem.
@@ -498,26 +506,55 @@ def remove_response(trace, inventory=None, output="VEL", water_level=60,
 
 
 def process_remove_response_Apollo(stream, inv, pre_filt=None, output='VEL'):
-
+    # see also remove_response_from_seismogram() in extra_plots
+    
 
     stream.attach_response(inv)
 
     # remove the response when we need to remove the mean and deal with 
     # gaps in the seismogram
-    stream = stream.merge()
+    # stream = stream.merge()
+
+
+    # remove location (ground station)
+    for tr in stream:
+        tr.stats.location = ''
+
+    stream = stream.split()
+    # detrend
+    stream.detrend('linear')
+
+    # merge the streams
+    stream.merge()
+    # if stream.count() > 1:
+    #     print('Too many streams - exiting')
+
 
     for tr in stream:
-        # remove the mean
-        mean = tr.data.mean()
-        tr.data = tr.data - mean
 
         # find the gaps in the trace
         if isinstance(tr.data,np.ma.MaskedArray):
             mask = np.ma.getmask(tr.data)
             # refill the gaps in the trace with zeros 
-            tr.data = np.ma.MaskedArray(tr.data,fill_value=0)
+            tr.data = np.ma.filled(tr.data,fill_value=0)
         else:
             mask = None
+
+    stream = stream.merge()
+    #     # remove the mean
+    #     mean = tr.data.mean()
+    #     tr.data = tr.data - mean
+        
+
+        # # find the gaps in the trace
+        # if isinstance(tr.data,np.ma.MaskedArray):
+        #     mask = np.ma.getmask(tr.data)
+        #     # refill the gaps in the trace with zeros 
+        #     tr.data = np.ma.filled(tr.data,fill_value=0)
+        #     print('about to plot')
+        #     tr.plot()
+        # else:
+        #     mask = None
 
         # zero_mean=False - because the trace can be asymmetric - remove the mean ourselves
         # do not taper here - it doesn't work well with the masked arrays - often required
@@ -527,8 +564,12 @@ def process_remove_response_Apollo(stream, inv, pre_filt=None, output='VEL'):
         # remove_response(tr, pre_filt=pre_filt,output=output,
         #         water_level=None,zero_mean=False,taper=False,plot=False)
 
-        trace, freqs, spectra =remove_response(tr, pre_filt=pre_filt,output=output,
-                water_level=None,zero_mean=False,taper=False,plot=False,return_spectra=True)
+    # is there an issue where this is not returning the updated trace? 
+    trace, freqs, spectra =remove_response(stream[0], pre_filt=pre_filt,output=output,
+            water_level=None,zero_mean=False,taper=False,plot=False,return_spectra=True)
+    # remove_response(stream[0], pre_filt=pre_filt,output=output,
+    #         water_level=None,zero_mean=False,taper=False,plot=True,return_spectra=False)
+    stream[0] = trace
 
         # plt.loglog(freqs, spectra, alpha=0.5)
         # plt.show()
@@ -537,25 +578,49 @@ def process_remove_response_Apollo(stream, inv, pre_filt=None, output='VEL'):
         #   title='{} S12 '.format(str(starttime)))
         # exit()
 
-        # now put the masked areas back 
-        if mask is not None:
-            tr.data = np.ma.array(tr.data, mask = mask)  
+    # now put the masked areas back 
+    if mask is not None:
+        stream[0].data = np.ma.array(stream[0].data, mask = mask)  
+
+    return stream 
+
+
 
 
 
 def process_envelope(stream,inv,pre_filt,output='VEL',smooth_periods=10,square=True):
 
-    stream.attach_response(inv)
+    stream = process_remove_response_Apollo(stream, inv, pre_filt=pre_filt,output=output)
     
-    # remove the response when we need to remove the mean and deal with 
-    # gaps in the seismogram
-    stream = stream.merge()
 
+    # stream.attach_response(inv)
+    # print('len ', len(stream), square)
+    # 
+    # # remove the response when we need to remove the mean and deal with 
+    # # gaps in the seismogram
+    # stream = stream.merge()
+    # 
+    # for tr in stream:
+    #     # remove the mean
+    #     mean = tr.data.mean()
+    #     tr.data = tr.data - mean
+    # 
+    #     # find the gaps in the trace
+    #     if isinstance(tr.data,np.ma.MaskedArray):
+    #         mask = np.ma.getmask(tr.data)
+    #         # refill the gaps in the trace with zeros 
+    #         tr.data = np.ma.MaskedArray(tr.data,fill_value=0)
+    #     else:
+    #         mask = None
+    # 
+    #     # zero_mean=False - because the trace can be asymmetric - remove the mean ourselves
+    #     # do not taper here - it doesn't work well with the masked arrays - often required
+    #     # when there are gaps - if necessary taper first
+    #     # water level - this probably doesn't have much impact - because we are pre filtering
+    #     # stream.remove_response(pre_filt=pre_filt,output="DISP",water_level=30,zero_mean=False,taper=False,plot=True,fig=outfile)
+    #     remove_response(tr, pre_filt=pre_filt,output=output,
+    #             water_level=None,zero_mean=False,taper=False,plot=False)
     for tr in stream:
-        # remove the mean
-        mean = tr.data.mean()
-        tr.data = tr.data - mean
-
         # find the gaps in the trace
         if isinstance(tr.data,np.ma.MaskedArray):
             mask = np.ma.getmask(tr.data)
@@ -563,14 +628,6 @@ def process_envelope(stream,inv,pre_filt,output='VEL',smooth_periods=10,square=T
             tr.data = np.ma.MaskedArray(tr.data,fill_value=0)
         else:
             mask = None
-
-        # zero_mean=False - because the trace can be asymmetric - remove the mean ourselves
-        # do not taper here - it doesn't work well with the masked arrays - often required
-        # when there are gaps - if necessary taper first
-        # water level - this probably doesn't have much impact - because we are pre filtering
-        # stream.remove_response(pre_filt=pre_filt,output="DISP",water_level=30,zero_mean=False,taper=False,plot=True,fig=outfile)
-        remove_response(tr, pre_filt=pre_filt,output=output,
-                water_level=None,zero_mean=False,taper=False,plot=False)
 
         if square: 
             tr.data = np.square(tr.data)
@@ -590,6 +647,12 @@ def process_envelope(stream,inv,pre_filt,output='VEL',smooth_periods=10,square=T
         
         tr.data = y_avg
 
+        # now put the masked areas back 
+        if mask is not None:
+            tr.data = np.ma.array(tr.data, mask = mask) 
+
+    return stream 
+
 #             SECONDS_PER_DAY = 86400
 #             for i, ax in enumerate(fig.get_axes()):
 #                 for ii, in enumerate([(0.3,0.9)])
@@ -607,9 +670,7 @@ def process_envelope(stream,inv,pre_filt,output='VEL',smooth_periods=10,square=T
 #                     # print(x_time.shape)
 #                     ax.plot(x_time, y_avg, label=window, color='r')
 
-        # now put the masked areas back 
-        if mask is not None:
-            tr.data = np.ma.array(tr.data, mask = mask) 
+
 
 
 
@@ -636,66 +697,69 @@ def process_envelope(stream,inv,pre_filt,output='VEL',smooth_periods=10,square=T
 def plot_seismogram_with_envelopes(stream, inv, output='VEL', pre_filt_main=None, 
     pre_filt_env=None,smooth_periods=10,plot_type='with_seismogram',title=None):
 
-
-
-    # stream = stream.merge()
-    stream = stream.select(channel='MHZ')
-
-    if title:
-        title = '{} - {}'.format(title, 'MHZ')
-
-    stream_orig = stream.copy()
-    process_remove_response_Apollo(stream, inv, pre_filt=pre_filt_main, output=output)
-
-    if plot_type=='with_seismogram':
-        fig = plt.figure(figsize=(8,3))
-        for i, tr in enumerate(stream): 
-            x_time = tr.times()
-            plt.plot(x_time,tr.data,color='k')
-            if pre_filt_env is not None:
-                for pre_filt in pre_filt_env:
-                    stream_env = stream_orig.copy()
-                    process_envelope(stream_env, inv, pre_filt=pre_filt,smooth_periods=smooth_periods,square=False)
-                    # plot the square 
-                    plt.plot(x_time,stream_env[0].data,label='{} - {} Hz'.format(pre_filt[1],pre_filt[2]))
+    if len(stream) > 0: 
+        station = stream[0].stats.station
+        channel = stream[0].stats.channel
 
         if title:
-            plt.title(title)
-        plt.xlabel('Seconds',fontsize='12')
-        plt.ylabel(r'Acceleration [m/s$^{-2}$]',fontsize='12')
-        plt.legend()
-        plt.subplots_adjust(bottom=0.15)
-        plt.show()
-    elif plot_type=='normalized':
-        # TODO check whether it is too curved. 
-        print("""This is a squared version of the envelope (for intensity).
-            But it is not clear whether the start is too curved.""")
-        fig, axes = plt.subplots(1, 1, sharex=True, figsize=(7, 4))
-        for i, tr in enumerate(stream): 
-            x_time = tr.times()
-            if pre_filt_env is not None:
-                for ii, pre_filt in enumerate(pre_filt_env):
-                    stream_env = stream_orig.copy()
-                    # calculate normalization factor 
-                    # smooth this strongly to help with the normalization 
-                    process_envelope(stream_env, inv, pre_filt=pre_filt,smooth_periods=400,square=True)
-                    trace_max = stream_env[0].max()
-                    stream_env = stream_orig.copy()
-                    # process again 
-                    process_envelope(stream_env, inv, pre_filt=pre_filt,smooth_periods=smooth_periods,square=True)
-                    # don't plot them on top of each other, but shift by 1 each time
-                    # plt.plot(x_time,stream_env[0].data/trace_max+ ii,label=str(pre_filt))
-                    plt.plot(x_time,stream_env[0].data/trace_max,label='{} - {} Hz'.format(pre_filt[1],pre_filt[2]))
+            title = '{} - {} - {}'.format(title, channel, station)
+
+        stream_orig = stream.copy()
+        stream = process_remove_response_Apollo(stream, inv, pre_filt=pre_filt_main,output=output)
+    
+        if plot_type=='with_seismogram':
+            fig = plt.figure(figsize=(8,3))
+            for i, tr in enumerate(stream): 
+                x_time = tr.times()
+                plt.plot(x_time,tr.data,color='k')
+                if pre_filt_env is not None:
+                    for pre_filt in pre_filt_env:
+                        stream_env = stream_orig.copy()
+                        stream_env = process_envelope(stream_env, inv, pre_filt=pre_filt,output=output,smooth_periods=smooth_periods,square=False)
+                        # print('before')
+                        # stream_env.plot()
+                        # plot the envelope  
+                        plt.plot(x_time,stream_env[0].data,label='{} - {} Hz'.format(pre_filt[1],pre_filt[2]))
+                        # print('after')
+                        # stream_env.plot()
+
+            if title:
+                plt.title(title)
+            plt.xlabel('Seconds',fontsize='12')
+            plt.ylabel(r'Acceleration [m/s$^{-2}$]',fontsize='12')
+            plt.legend(loc='lower right',framealpha=0)
+            plt.subplots_adjust(bottom=0.15)
+            plt.show()
+        elif plot_type=='normalized':
+            # TODO check whether it is too curved. 
+            print("""This is a squared version of the envelope (for intensity).
+                But it is not clear whether the start is too curved.""")
+            fig, axes = plt.subplots(1, 1, sharex=True, figsize=(7, 4))
+            for i, tr in enumerate(stream): 
+                x_time = tr.times()
+                if pre_filt_env is not None:
+                    for ii, pre_filt in enumerate(pre_filt_env):
+                        stream_env = stream_orig.copy()
+                        # calculate normalization factor 
+                        # smooth this strongly to help with the normalization 
+                        process_envelope(stream_env, inv, pre_filt=pre_filt,output=output,smooth_periods=400,square=True)
+                        trace_max = stream_env[0].max()
+                        stream_env = stream_orig.copy()
+                        # process again 
+                        process_envelope(stream_env, inv, pre_filt=pre_filt,output=output,smooth_periods=smooth_periods,square=True)
+                        # don't plot them on top of each other, but shift by 1 each time
+                        # plt.plot(x_time,stream_env[0].data/trace_max+ ii,label=str(pre_filt))
+                        plt.plot(x_time,stream_env[0].data/trace_max,label='{} - {} Hz'.format(pre_filt[1],pre_filt[2]))
 
 
-        if title:
-            plt.title(title)
-        plt.xlabel('Seconds',fontsize='12')
-        plt.ylabel(r'Intensity [m$^2$/s$^{-4}$]',fontsize='12')
-        plt.legend()
-        plt.subplots_adjust(bottom=0.12)
-        plt.ylim(0,2)
-        plt.show()
+            if title:
+                plt.title(title)
+            plt.xlabel('Seconds',fontsize='12')
+            plt.ylabel(r'Intensity [m$^2$/s$^{-4}$]',fontsize='12')
+            plt.legend()
+            plt.subplots_adjust(bottom=0.12)
+            plt.ylim(0,2)
+            plt.show()
 
         
 
@@ -921,9 +985,8 @@ def plot_example():
 
 def view_catalog_with_envelopes(top_level_dir,file,inv_name,
   dir_type='pdart_dir',pre_filt_main=None,pre_filt_env=None,output='VEL',
-  smooth_periods=10,time_before=600,time_after=3600,plot_type='with_seismogram'): 
-
-    
+  smooth_periods=10,time_before=600,time_after=3600,plot_type='with_seismogram',
+  stations=STATION_LIST): 
 
     file_out = file.replace('.xml', '_out.xml')
 
@@ -935,69 +998,122 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
     #     for station in network[0]:
     #         print(station)
     # print(inv[0][0][0].response)
-    # exit()
-    # just using Station 12 at the moment 
-    station_code = 'S12'
-    latitude = [-3.01084]
-    longitude = [-23.42456]
     
     catalog = read_events(file)
     quit = False
     
-    # put the whole thing in a try, because we need to save if something goes 
-    # wrong
-    # try: 
     # start_no = 129
-    start_no = 0
+    start_no = 14
+    start_no = 6
     for i, ev in enumerate(catalog[start_no:]):
-            starttime = None
-            endtime = None
-            for origin in ev.origins:
-                distance, azimuth_A_B, azimuth_B_A =  gps2dist_azimuth(
-                  origin.latitude, origin.longitude, latitude[0], longitude[0], MOON_RADIUS, MOON_FLATTENING)
-                distance = distance/1000.
-                print(ev.event_type)
-                for desc in ev.event_descriptions:
-                    print(desc.text)
-                print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
-            
+        print('Event: ', start_no+i, ev)
+        # use the preferred origin if it exists
+        origin = ev.preferred_origin()
+        if origin is None: 
+            try: 
+                origin = ev.origins[0]
+            except: 
+                print('No origin found for: \m{}'.format(str(ev)))
+                break 
 
-            picks = ev.picks
-            for pick in picks:
-                print('Event in catalog number {}, Pick Time {}, Phase hint {}'.format(i+start_no, pick.time, pick.phase_hint))
-                # continue
-                if not starttime:
-                    starttime = pick.time
-                else:
-                    if pick.time < starttime:
-                        starttime = pick.time
+        for station_code in stations: 
+
+            endtime = None
+            starttime = None
+            if origin.time is not None: 
+                starttime  = origin.time
+            else: 
+                picks = ev.picks
+                for pick in picks:
+                    print('now doing some more picks')
+                    if pick.waveform_id.station_code == station_code: 
+                        print('Event in catalog number {}, Pick Time {}, Phase hint {}'.format(i+start_no, pick.time, pick.phase_hint))
+                        # continue
+                        if not starttime:
+                            starttime = pick.time
+                        else:
+                            if pick.time < starttime:
+                                starttime = pick.time
+        
+                # if starttime is not None, then a pick was found for this event and station
+                if starttime is None:
+                    print('Event at {} not found for station {} (pick not found)'.format(str(starttime),station_code))
+                    quit=False
+                    continue # continue station loop 
+
+            latitude = LATITUDES[STATION_LIST.index(station_code)]
+            longitude = LONGITUDES[STATION_LIST.index(station_code)]
+            MH1_azimuth = MH1_AZIMUTHS[STATION_LIST.index(station_code)]
+            MH2_azimuth = MH2_AZIMUTHS[STATION_LIST.index(station_code)]
+
+            distance, azimuth_A_B, azimuth_B_A =  gps2dist_azimuth(
+              origin.latitude, origin.longitude, latitude, longitude, MOON_RADIUS, MOON_FLATTENING)
+            distance = distance/1000.
+            print(ev.event_type)
+            for desc in ev.event_descriptions:
+                print(desc.text)
+            print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
     
-            if starttime:
-            
-                # print('Temporarily changed to 1/2 hour')
-                # starttime -= 1800.
-                starttime -= time_before
-                endtime = starttime + time_after
-            
-                while True:
-                    stream = find_seismogram(top_level_dir,starttime,endtime,
-                      stations=[station_code],dir_type=dir_type)
-            
-                    plot_seismogram_with_envelopes(stream, inv, output=output, 
-                         pre_filt_main=pre_filt_main, pre_filt_env=pre_filt_env,
-                         smooth_periods=smooth_periods,
-                         plot_type=plot_type,title=str(starttime))
-            
-                    input_string = '''view again (v), next (n), quit(q)\n'''
+            # print('Temporarily changed to 1/2 hour')
+            # starttime -= 1800.
+            starttime -= time_before
+            endtime = starttime + time_after
+
+            stream = find_seismogram(top_level_dir,starttime,endtime,
+              stations=[station_code],dir_type=dir_type,channels=['MHZ','MH1','MH2'])
+
+            if stream is None or len(stream) == 0: 
+                print('Event at {} not found for station {}'.format(str(starttime),station_code))
+                quit=False
+                continue # continue station loop 
+
+            channel = 'MHZ'
+        
+            while True:
+
+                working_stream = stream.select(channel=channel).copy()
+                if len(working_stream) == 0: 
+                    print('Event at {} not found for channel {}'.format(str(starttime), channel))
+                    input_string = '''view again (v), next (n), MH1, MH2, MHZ, quit(q)\n'''
                     output_str = input(input_string)
-                    if output_str == 'v': #view again 
-                        pass 
+                    if output_str in ('MH1', 'MH2', 'MHZ'):
+                        channel=output_str
                     elif output_str == 'q': #quit
                         quit=True
-                        break
+                        break # break from station loop 
                     elif output_str == 'n': #next
                         quit=False
-                        break 
+                        break # break from station loop 
+
+                plot_seismogram_with_envelopes(working_stream, inv, output=output, 
+                     pre_filt_main=pre_filt_main, pre_filt_env=pre_filt_env,
+                     smooth_periods=smooth_periods,
+                     plot_type=plot_type,title=str(starttime))
+                    
+                input_string = '''view again (v), next (n), MH1, MH2, MHZ, quit(q)\n'''
+                output_str = input(input_string)
+                if output_str == 'v': #view again 
+                    pass
+                elif output_str in ('MH1', 'MH2', 'MHZ'):
+                    channel=output_str
+                elif output_str == 'q': #quit
+                    quit=True
+                    break
+                elif output_str == 'n': #next
+                    quit=False
+                    break 
+
+            # break from the station loop 
+            if quit:
+                break
+            else: 
+                continue 
+        # break from the event loop 
+        if quit:
+            break
+        else: 
+            continue 
+
                 # this is not written yet, but it's to save out the changes
                 # to the xml file 
                 # if quit == False:
@@ -1019,8 +1135,9 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
                 #     print(i+start_no)
                 # else:
                 #     break
-                if quit:
-                    break
+
+
+            # station level 
 
     # finally: 
     # 
@@ -1031,40 +1148,3 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
 # unit = m/(s*s)
 # genericAmplitude = number
         
-
-if __name__ == "__main__":
-    # top_level_dir = '/Users/nunn/lunar_data/PDART'
-    top_level_processed_dir = '/Users/nunn/lunar_data/PDART_PROCESSED'
-    inv_name = "/Users/nunn/lunar_data/IRIS_dataless_seed/XA.1969-1977.xml"
-    # these catalog are just some shorter versions - e.g. for one year
-    # the full catalog takes a long time to run
-    # view_catalog(top_level_processed_dir,'catalogs/1973_S12_deep.xml',inv_name,dir_type='processed_dir',output='VEL')          
-    # view_catalog(top_level_processed_dir,'catalogs/1973_S12_shallow.xml',inv_name,dir_type='processed_dir',output='VEL') 
-    # view_catalog(top_level_processed_dir,'catalogs/1973_S12_met.xml',inv_name,dir_type='processed_dir',output='VEL')
-    # view_catalog(top_level_processed_dir,'catalogs/S12_shallow.xml',inv_name,dir_type='processed_dir',output='VEL') 
-    pre_filt_main = [0.2,0.3,0.9,1.3]
-    pre_filt_env = [[0.1,0.25,0.75,1],[0.5,0.75,1.25,1.5],[1,1.25,1.75,2.25]]
-
-    # pre_filt_main = [0.2,0.3,0.9,1.3]
-    # pre_filt_env = [[0.05,0.08,0.15,0.25],[0.08,0.15,0.35,0.6],[0.3,0.35,0.55,0.7],[0.35,0.55,0.75,0.9]]
-
-
-
-    # view_catalog_with_envelopes(top_level_processed_dir,'../lunar_proposal/catalogs/S12_impact.xml',
-    #   inv_name,dir_type='processed_dir',pre_filt_main=pre_filt_main,pre_filt_env=pre_filt_env,output='ACC',smooth_periods=20)
-
-    # view_catalog_with_envelopes(top_level_processed_dir,
-    #   '../lunar_proposal/catalogs/S12_shallow.xml',inv_name,
-    #  dir_type='processed_dir',pre_filt_main=pre_filt_main,
-    #  pre_filt_env=pre_filt_env,output='ACC',smooth_periods=10,
-    #  plot_type='with_seismogram')
-
-    view_catalog_with_envelopes.view_catalog_with_envelopes(top_level_processed_dir,
-      '../lunar_proposal/catalogs/S12_shallow.xml',inv_name,
-     dir_type='processed_dir',pre_filt_main=pre_filt_main,
-     pre_filt_env=pre_filt_env,output='ACC',smooth_periods=10,
-     plot_type='normalized')
-
-
-
-    # plot_example()
