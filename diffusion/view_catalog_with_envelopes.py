@@ -987,8 +987,8 @@ def plot_example():
 
 def view_catalog_with_envelopes(top_level_dir,file,inv_name,
   dir_type='pdart_dir',pre_filt_main=None,pre_filt_env=None,output='VEL',
-  smooth_periods=10,time_before=600,time_after=3600,plot_type='with_seismogram',
-  stations=STATION_LIST,start_no=0):
+  smooth_periods=10,time_before=600,time_after=3600,plot_type='with_seismogram', 
+  stations=STATION_LIST,channel='MHZ',start_no=0,end_no=None):
     """
     :param top_level_dir: string
         full path the directory 
@@ -1017,27 +1017,31 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
     catalog = read_events(file)
     quit = False
     
-    for i, ev in enumerate(catalog[start_no:]):
+    if end_no is None:
+        end_no = len(catalog) + 1
+        print(end_no)
+    
+    for i, ev in enumerate(catalog[start_no:end_no]):
         print('Event: ', start_no+i, ev)
+        quit=True
+
         # use the preferred origin if it exists
         origin = ev.preferred_origin()
         if origin is None: 
             try: 
                 origin = ev.origins[0]
             except: 
-                print('No origin found for: \m{}'.format(str(ev)))
-                break 
+                origin = None
 
         for station_code in stations: 
 
             endtime = None
             starttime = None
-            if origin.time is not None: 
+            if origin is not None and origin.time is not None: 
                 starttime  = origin.time
             else: 
                 picks = ev.picks
                 for pick in picks:
-                    print('now doing some more picks')
                     if pick.waveform_id.station_code == station_code: 
                         print('Event in catalog number {}, Pick Time {}, Phase hint {}'.format(i+start_no, pick.time, pick.phase_hint))
                         # continue
@@ -1049,25 +1053,26 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
         
                 # if starttime is not None, then a pick was found for this event and station
                 if starttime is None:
-                    print('Event at {} not found for station {} (pick not found)'.format(str(starttime),station_code))
+                    print('Pick not found at station {} \n for Event: {}'.format(station_code,ev))
                     quit=False
                     continue # continue station loop 
 
-            latitude = LATITUDES[STATION_LIST.index(station_code)]
-            longitude = LONGITUDES[STATION_LIST.index(station_code)]
-            MH1_azimuth = MH1_AZIMUTHS[STATION_LIST.index(station_code)]
-            MH2_azimuth = MH2_AZIMUTHS[STATION_LIST.index(station_code)]
+            if origin is not None: 
+                latitude = LATITUDES[STATION_LIST.index(station_code)]
+                longitude = LONGITUDES[STATION_LIST.index(station_code)]
+                MH1_azimuth = MH1_AZIMUTHS[STATION_LIST.index(station_code)]
+                MH2_azimuth = MH2_AZIMUTHS[STATION_LIST.index(station_code)]
 
-            distance, azimuth_A_B, azimuth_B_A =  gps2dist_azimuth(
-              origin.latitude, origin.longitude, latitude, longitude, MOON_RADIUS, MOON_FLATTENING)
-            distance = distance/1000.
-            print(ev.event_type)
-            for desc in ev.event_descriptions:
-                print(desc.text)
-            print('Event: ', start_no+i, ev)
-            print({}-{}.station_code, channel)
-            print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
-    
+                distance, azimuth_A_B, azimuth_B_A =  gps2dist_azimuth(
+                  origin.latitude, origin.longitude, latitude, longitude, MOON_RADIUS, MOON_FLATTENING)
+                distance = distance/1000.
+                print(ev.event_type)
+                for desc in ev.event_descriptions:
+                    print(desc.text)
+                print('Event: ', start_no+i, ev)
+                print('{}-{}'.format(station_code, channel))
+                print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
+        
             # print('Temporarily changed to 1/2 hour')
             # starttime -= 1800.
             starttime -= time_before
@@ -1114,7 +1119,10 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
                     quit=True
                     break
                 elif output_str == 'n': #next
-                    quit=False
+                    if i+start_no+1 == end_no: 
+                        quit=True
+                    else: 
+                        quit=False
                     break 
 
             # break from the station loop 
@@ -1125,8 +1133,6 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
         # break from the event loop 
         if quit:
             break
-        else: 
-            continue 
 
                 # this is not written yet, but it's to save out the changes
                 # to the xml file 
