@@ -18,8 +18,11 @@ from future.builtins import *  # NOQA
 # from builtins import input
 from obspy import read_events, read_inventory
 from obspy.core import read, Stream
+from obspy.core.event.origin import Pick
+from obspy.core.event.base import WaveformStreamID
 from obspy.core.util.misc import limit_numpy_fft_cache
 from obspy.signal.filter import envelope
+from obspy.core.utcdatetime import UTCDateTime
 from future.utils import native_str
 import os.path
 import numpy as np
@@ -43,6 +46,16 @@ LATITUDES = [-3.01084,-3.6445,26.13407,-8.97577]
 LONGITUDES = [-23.42456,-17.47753,3.62981,15.49649]
 MH1_AZIMUTHS = [180,0,0,334.5]
 MH2_AZIMUTHS = [270,90,90,64.5]
+
+colors=['r','b','g','yellow','purple','pink']
+pick_colors=['purple','pink']
+ 
+filter_ids = ['smi:jpl/filter/Apollo/standard_0.25_0.75',
+  'smi:jpl/filter/Apollo/standard_0.75_1.25',
+  'smi:jpl/filter/Apollo/standard_1.25_1.75',
+]
+
+xdata = None
 
 ampl_dict =	{
   "purple": 3e-9,
@@ -696,8 +709,9 @@ def process_envelope(stream,inv,pre_filt,output='VEL',smooth_periods=10,square=T
         # if mask is not None:
         #     tr.data = np.ma.array(tr.data, mask = mask)  
 
-def plot_seismogram_with_envelopes(stream, inv, output='VEL', pre_filt_main=None, 
-    pre_filt_env=None,smooth_periods=10,plot_type='with_seismogram',title=None):
+def plot_seismogram_with_envelopes(stream, inv, station_code, catalog, file_out, event=None, origin=None, picks=None, 
+    begintime=None, output='VEL', pre_filt_main=None, 
+    pre_filt_env=None,smooth_periods=10,time_before=600,time_after=3600,plot_type='with_seismogram',title=None):
 
     if len(stream) > 0: 
         station = stream[0].stats.station
@@ -706,22 +720,41 @@ def plot_seismogram_with_envelopes(stream, inv, output='VEL', pre_filt_main=None
         if title:
             title = '{} - {} - {}'.format(title, channel, station)
 
+        if origin is not None: 
+            latitude = LATITUDES[STATION_LIST.index(station_code)]
+            longitude = LONGITUDES[STATION_LIST.index(station_code)]
+            MH1_azimuth = MH1_AZIMUTHS[STATION_LIST.index(station_code)]
+            MH2_azimuth = MH2_AZIMUTHS[STATION_LIST.index(station_code)]
+
+            distance, azimuth_A_B, azimuth_B_A =  gps2dist_azimuth(
+              origin.latitude, origin.longitude, latitude, longitude, MOON_RADIUS, MOON_FLATTENING)
+            distance = distance/1000.
+            print(event.event_type)
+            for desc in event.event_descriptions:
+                print(desc.text)
+            # print('Event: ', event_no, event)
+            # print('{}-{}'.format(station_code, channel))
+            # print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
+
+
         stream_orig = stream.copy()
         stream = process_remove_response_Apollo(stream, inv, pre_filt=pre_filt_main,output=output)
     
         if plot_type=='with_seismogram':
+    
             fig = plt.figure(figsize=(8,3))
             for i, tr in enumerate(stream): 
-                x_time = tr.times()
+                x_time = tr.times()-time_before
                 plt.plot(x_time,tr.data,color='k')
+
                 if pre_filt_env is not None:
-                    for pre_filt in pre_filt_env:
+                    for ii, pre_filt in enumerate(pre_filt_env):
                         stream_env = stream_orig.copy()
                         stream_env = process_envelope(stream_env, inv, pre_filt=pre_filt,output=output,smooth_periods=smooth_periods,square=False)
                         # print('before')
                         # stream_env.plot()
                         # plot the envelope  
-                        plt.plot(x_time,stream_env[0].data,label='{} - {} Hz'.format(pre_filt[1],pre_filt[2]))
+                        plt.plot(x_time,stream_env[0].data,label='{} - {} Hz'.format(pre_filt[1],pre_filt[2]),color=colors[ii])
                         # print('after')
                         # stream_env.plot()
 
@@ -730,8 +763,83 @@ def plot_seismogram_with_envelopes(stream, inv, output='VEL', pre_filt_main=None
             plt.xlabel('Seconds',fontsize='12')
             plt.ylabel(r'Acceleration [m/s$^{-2}$]',fontsize='12')
             plt.legend(loc='lower right',framealpha=0)
+            plt.xlim(-time_before,time_after)
             plt.subplots_adjust(bottom=0.15)
-            plt.show()
+
+            if picks is not None: 
+                for pick in picks:
+                    if pick.phase_hint == 'P' and pick.waveform_id.station_code==station_code:
+                        pick_markP = pick.time - begintime - time_before
+                        plt.gca().axvline(x=pick_markP, 
+                                              color=pick_colors[0], linewidth=2)
+
+
+                    if pick.phase_hint == 'S' and pick.waveform_id.station_code==station_code:
+                        pick_markS = pick.time - begintime - time_before
+                        plt.gca().axvline(x=pick_markS, 
+                                              color=pick_colors[1], linewidth=2)
+
+                    if (pick.filter_id is not None and 
+                      pick.phase_hint in ('t_max','t_onset') and 
+                      pick.waveform_id.station_code==station_code): 
+
+                        pick_mark = pick.time - begintime - time_before
+                        if pick.filter_id == filter_ids[0]:
+                            color=colors[0]
+                        elif pick.filter_id == filter_ids[1]:
+                            color=colors[1]
+                        elif pick.filter_id == filter_ids[2]:
+                            color=colors[2]
+
+                        plt.gca().axvline(x=pick_mark, 
+                            color=color, linewidth=2)
+
+
+            # XXXXXX
+
+            plt.show(block=False)
+            while True:
+                print('Left click on t_onset or t_max. Or press return.')
+                cid = fig.canvas.mpl_connect('button_press_event', onclick)
+                input_string = '''Left click on t_onset or t_max.\nSet t_onset and t_max: (to1), (tm1), (to2), (tm2), (to3), (tm3)\nOr press return.'''
+                output_str = input(input_string)
+                if output_str in ('to1', 'tm1', 'to2', 'tm2', 'to3', 'tm3'):
+                    measurement_type = output_str[0:2]
+                    number = int(output_str[2])
+                    freq = pre_filt_env[number-1]
+                    plt.gca().axvline(x=xdata,
+                      color=colors[number-1], linewidth=3)
+                    plt.draw()
+                    save_pick_to_event(event,output_str,xdata,station_code,begintime,
+                      time_before,pre_filt_env)
+                    # plt.pause(0.01)
+
+                elif output_str in ('\n'):
+                    break
+
+                # this is not written yet, but it's to save out the changes
+                # to the xml file 
+                # if quit == False:
+                #     res_id = str(pick.resource_id).replace('pick','amplitude_est')
+                #     res_id = ResourceIdentifier(id=res_id)
+                #     res_id.convert_id_to_quakeml_uri(authority_id=AUTHORITY_ID)
+                #     amplitude = Amplitude(resource_id=res_id)
+                # 
+                #     if output_str not in ('n', 'na'):
+                #         amplitude.unit = "m/(s*s)"
+                #         amplitude.generic_amplitude = ampl_dict[output_str]
+                #         amplitude.type = 'A'
+                #     else: 
+                #         amplitude.type = ampl_dict[output_str]
+                #     amplitude.pick_id = pick.resource_id
+                #     ev.amplitudes.append(amplitude)
+                # 
+                #     catalog.write(filename=file_out, format='QUAKEML') 
+                #     print(i+start_no)
+                # else:
+                #     break
+
+        
         elif plot_type=='normalized':
             # TODO check whether it is too curved. 
             print("""This is a squared version of the envelope (for intensity).
@@ -761,10 +869,38 @@ def plot_seismogram_with_envelopes(stream, inv, output='VEL', pre_filt_main=None
             plt.legend()
             plt.subplots_adjust(bottom=0.12)
             plt.ylim(0,2)
-            plt.show()
 
-        
+# yyyyyy
+def save_pick_to_event(event,output_str,pick_seconds,station_code,begintime,
+  time_before,pre_filt_env):
 
+    measurement_type = output_str[0:2]
+    if measurement_type == 'to':
+        phase_hint = 't_onset'
+    elif measurement_type == 'tm':
+        phase_hint = 't_max'
+    number = int(output_str[2])
+    freq = pre_filt_env[number-1]
+    filter_id = filter_ids[number-1] 
+
+    found = False
+    for pick in event.picks:
+        if (pick.phase_hint == phase_hint and 
+          pick.waveform_id.station_code==station_code and 
+          pick.filter_id==filter_id): 
+            found = True
+            pick.time = begintime+time_before+pick_seconds
+
+    if found is False: 
+        pick = Pick()
+        pick.phase_hint = phase_hint
+        pick.time = begintime+time_before+pick_seconds
+        pick.filter_id = filter_id
+        waveformStreamID = WaveformStreamID()
+        waveformStreamID.station_code = station_code
+        waveformStreamID.network_code = 'XA'
+        pick.waveform_id = waveformStreamID
+        event.picks.append(pick)
     # 
     # stream += stream_orig
 
@@ -984,11 +1120,11 @@ def plot_example():
     ax.legend()
     plt.show()
 
-
+###########HERE
 def view_catalog_with_envelopes(top_level_dir,file,inv_name,
-  dir_type='pdart_dir',pre_filt_main=None,pre_filt_env=None,output='VEL',
+  dir_type='processed_dir',pre_filt_main=None,pre_filt_env=None,output='VEL',
   smooth_periods=10,time_before=600,time_after=3600,plot_type='with_seismogram', 
-  stations=STATION_LIST,channel='MHZ',start_no=0,end_no=None):
+  stations=STATION_LIST,channel='MHZ',start_no=0,end_no=None,title=None):
     """
     :param top_level_dir: string
         full path the directory 
@@ -1019,102 +1155,51 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
     
     if end_no is None:
         end_no = len(catalog) + 1
-        print(end_no)
     
     for i, ev in enumerate(catalog[start_no:end_no]):
         print('Event: ', start_no+i, ev)
         quit=True
 
-        # use the preferred origin if it exists
-        origin = ev.preferred_origin()
-        if origin is None: 
-            try: 
-                origin = ev.origins[0]
-            except: 
-                origin = None
-
         for station_code in stations: 
-
-            endtime = None
-            starttime = None
-            if origin is not None and origin.time is not None: 
-                starttime  = origin.time
-            else: 
-                picks = ev.picks
-                for pick in picks:
-                    if pick.waveform_id.station_code == station_code: 
-                        print('Event in catalog number {}, Pick Time {}, Phase hint {}'.format(i+start_no, pick.time, pick.phase_hint))
-                        # continue
-                        if not starttime:
-                            starttime = pick.time
-                        else:
-                            if pick.time < starttime:
-                                starttime = pick.time
-        
-                # if starttime is not None, then a pick was found for this event and station
-                if starttime is None:
-                    print('Pick not found at station {} \n for Event: {}'.format(station_code,ev))
-                    quit=False
-                    continue # continue station loop 
-
-            if origin is not None: 
-                latitude = LATITUDES[STATION_LIST.index(station_code)]
-                longitude = LONGITUDES[STATION_LIST.index(station_code)]
-                MH1_azimuth = MH1_AZIMUTHS[STATION_LIST.index(station_code)]
-                MH2_azimuth = MH2_AZIMUTHS[STATION_LIST.index(station_code)]
-
-                distance, azimuth_A_B, azimuth_B_A =  gps2dist_azimuth(
-                  origin.latitude, origin.longitude, latitude, longitude, MOON_RADIUS, MOON_FLATTENING)
-                distance = distance/1000.
-                print(ev.event_type)
-                for desc in ev.event_descriptions:
-                    print(desc.text)
-                print('Event: ', start_no+i, ev)
-                print('{}-{}'.format(station_code, channel))
-                print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
-        
-            # print('Temporarily changed to 1/2 hour')
-            # starttime -= 1800.
-            starttime -= time_before
-            endtime = starttime + time_after
-
-            stream = find_seismogram(top_level_dir,starttime,endtime,
-              stations=[station_code],dir_type=dir_type,channels=['MHZ','MH1','MH2'])
-
-            if stream is None or len(stream) == 0: 
-                print('Event at {} not found for station {}'.format(str(starttime),station_code))
-                quit=False
-                continue # continue station loop 
-
             channel = 'MHZ'
-        
-            while True:
+            while True: 
+            
+                found = display_envelopes(top_level_dir=top_level_dir, event=ev, 
+                    event_no=start_no+i, 
+                    inv=inv, catalog=catalog, file_out=file_out,
+                    station_code=station_code, channel=channel, dir_type=dir_type,
+                    pre_filt_main=pre_filt_main,output=output,
+                    pre_filt_env=pre_filt_env, 
+                    smooth_periods=smooth_periods,time_before=time_before,time_after=time_after,
+                    plot_type=plot_type,title=title)
 
-                working_stream = stream.select(channel=channel).copy()
-                if len(working_stream) == 0: 
-                    print('Event at {} not found for channel {}'.format(str(starttime), channel))
-                    input_string = '''view again (v), next (n), MH1, MH2, MHZ, quit(q)\n'''
-                    output_str = input(input_string)
-                    if output_str in ('MH1', 'MH2', 'MHZ'):
-                        channel=output_str
-                    elif output_str == 'q': #quit
+
+
+                if found == False: #next
+                    if i+start_no+1 == end_no: 
                         quit=True
-                        break # break from station loop 
-                    elif output_str == 'n': #next
+                    else: 
+                        set_measurement = None
                         quit=False
-                        break # break from station loop 
+                    break 
 
-                plot_seismogram_with_envelopes(working_stream, inv, output=output, 
-                     pre_filt_main=pre_filt_main, pre_filt_env=pre_filt_env,
-                     smooth_periods=smooth_periods,
-                     plot_type=plot_type,title=str(starttime))
-                    
-                input_string = '''view again (v), next (n), MH1, MH2, MHZ, quit(q)\n'''
+                plt.close()
+                input_string = '''View again (v), next (n), save (s), MH1, MH2, MHZ, quit(q)'''
+# \nOr set t_onset and t_max: (to1), (tm1), (to2), (tm2), (to3), (tm3)\n'''
                 output_str = input(input_string)
                 if output_str == 'v': #view again 
-                    pass
+                    set_measurement = None
                 elif output_str in ('MH1', 'MH2', 'MHZ'):
                     channel=output_str
+                    set_measurement = None
+                elif output_str == 's':
+                    catalog.write(filename=file_out, format='QUAKEML') 
+                    if i+start_no+1 == end_no: 
+                        quit=True
+                    else: 
+                        set_measurement = None
+                        quit=False
+                    break 
                 elif output_str == 'q': #quit
                     quit=True
                     break
@@ -1122,6 +1207,7 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
                     if i+start_no+1 == end_no: 
                         quit=True
                     else: 
+                        set_measurement = None
                         quit=False
                     break 
 
@@ -1134,39 +1220,114 @@ def view_catalog_with_envelopes(top_level_dir,file,inv_name,
         if quit:
             break
 
-                # this is not written yet, but it's to save out the changes
-                # to the xml file 
-                # if quit == False:
-                #     res_id = str(pick.resource_id).replace('pick','amplitude_est')
-                #     res_id = ResourceIdentifier(id=res_id)
-                #     res_id.convert_id_to_quakeml_uri(authority_id=AUTHORITY_ID)
-                #     amplitude = Amplitude(resource_id=res_id)
-                # 
-                #     if output_str not in ('n', 'na'):
-                #         amplitude.unit = "m/(s*s)"
-                #         amplitude.generic_amplitude = ampl_dict[output_str]
-                #         amplitude.type = 'A'
-                #     else: 
-                #         amplitude.type = ampl_dict[output_str]
-                #     amplitude.pick_id = pick.resource_id
-                #     ev.amplitudes.append(amplitude)
-                # 
-                #     catalog.write(filename=file_out, format='QUAKEML') 
-                #     print(i+start_no)
-                # else:
-                #     break
+def display_envelopes(top_level_dir, event, event_no, inv, catalog, file_out, station_code, channel,
+      dir_type='pdart_dir',pre_filt_main=None,pre_filt_env=None,
+      output='VEL', 
+      smooth_periods=10,time_before=600,time_after=3600,plot_type='with_seismogram',title=None):
+
+    # print(top_level_dir, 
+    # print(event_no)
+    #      # event, event_no, inv, station_code, channel,
+    #      #  dir_type,pre_filt_main,pre_filt_env,
+    #      #  output, 
+    #      #  smooth_periods,time_before,time_after,plot_type)
+    # exit()
+
+    # use the preferred origin if it exists
+    origin = event.preferred_origin()
+    if origin is None: 
+        try: 
+            origin = event.origins[0]
+        except: 
+            origin = None
+
+    endtime = None
+    starttime = None
+    picks = event.picks
+    if origin is not None and origin.time is not None: 
+        starttime  = origin.time
+    else: 
+        
+        for pick in picks:
+            if pick.waveform_id.station_code == station_code: 
+                print('Event in catalog number {}, Pick Time {}, Phase hint {}'.format(i+start_no, pick.time, pick.phase_hint))
+                # continue
+                if not starttime:
+                    starttime = pick.time
+                else:
+                    if pick.time < starttime:
+                        starttime = pick.time
+
+        # if starttime is not None, then a pick was found for this event and station
+        if starttime is None:
+            print('Pick not found at station {} \n for Event: {}'.format(station_code,ev))
+            return False
 
 
-            # station level 
+    # print('Temporarily changed to 1/2 hour')
+    # starttime -= 1800.
+    begintime = starttime - time_before
+    endtime = starttime + time_after
 
-    # finally: 
-    # 
-    #     catalog.write(filename=file_out, format='QUAKEML') 
-    #     print(i+start_no)
+    stream = find_seismogram(top_level_dir,begintime,endtime,
+      stations=[station_code],dir_type=dir_type,channels=[channel])
 
-# category = other
-# unit = m/(s*s)
-# genericAmplitude = number
+    if stream is None or len(stream) == 0: 
+        print('Event at {} not found for station {}'.format(str(starttime),station_code))
+        return False
+    # else: 
+    #     print('Event found, ', event)
+
+    plot_seismogram_with_envelopes(stream, inv, station_code=station_code,
+         catalog=catalog,
+         file_out=file_out,
+         event=event,
+         origin=origin,
+         picks=picks,
+         begintime=begintime,
+         output=output, 
+         pre_filt_main=pre_filt_main, pre_filt_env=pre_filt_env,
+         smooth_periods=smooth_periods,
+         time_before=time_before,time_after=time_after,
+         plot_type=plot_type,title=str(starttime))
+
+
+# 
+# 
+#                 # this is not written yet, but it's to save out the changes
+#                 # to the xml file 
+#                 # if quit == False:
+#                 #     res_id = str(pick.resource_id).replace('pick','amplitude_est')
+#                 #     res_id = ResourceIdentifier(id=res_id)
+#                 #     res_id.convert_id_to_quakeml_uri(authority_id=AUTHORITY_ID)
+#                 #     amplitude = Amplitude(resource_id=res_id)
+#                 # 
+#                 #     if output_str not in ('n', 'na'):
+#                 #         amplitude.unit = "m/(s*s)"
+#                 #         amplitude.generic_amplitude = ampl_dict[output_str]
+#                 #         amplitude.type = 'A'
+#                 #     else: 
+#                 #         amplitude.type = ampl_dict[output_str]
+#                 #     amplitude.pick_id = pick.resource_id
+#                 #     ev.amplitudes.append(amplitude)
+#                 # 
+#                 #     catalog.write(filename=file_out, format='QUAKEML') 
+#                 #     print(i+start_no)
+#                 # else:
+#                 #     break
+# 
+# 
+#             # station level 
+# 
+#     # finally: 
+#     # 
+#     #     catalog.write(filename=file_out, format='QUAKEML') 
+#     #     print(i+start_no)
+# 
+# # category = other
+# # unit = m/(s*s)
+# # genericAmplitude = number
+# ###########HERE1
 
 def plot_seismograms_with_envelopes(stream, inv, output='VEL', pre_filt_main=None, 
     pre_filt_env=None,smooth_periods=10,plot_type='section',title=None):
@@ -1231,8 +1392,6 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
 
     file_out = file.replace('.xml', '_out.xml')
 
-    colors=['r','b','g','purple','pink','yellow']
-
     # read the response file
     inv = read_inventory(inv_name)
     
@@ -1254,11 +1413,15 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
     plt.plot(P_arrivals, P_kilometers, color='#4B0082')
     plt.plot(S_arrivals, S_kilometers, color='#FF1493', linestyle='dashed')
 
+    start_no = 1
+    end_no = 2
+
     if end_no is None:
         end_no = len(catalog) + 1
     for i, ev in enumerate(catalog[start_no:end_no]):
+        
         if ev.event_type != 'crash':
-            print('Event is not a crash: ', start_no+i, ev)
+            # print('Event is not a crash: ', start_no+i, ev)
             continue
 
         print('Event: ', start_no+i, ev)
@@ -1339,10 +1502,23 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
                     pick_markP = pick.time - origin.time
                     plt.vlines(x=pick_markP, ymin=distance-scale*2, ymax=distance+scale*2, color='#4B0082', linewidth=3)
 
-                if pick.phase_hint == 'S' and pick.waveform_id.station_code==station_code:
+                elif pick.phase_hint == 'S' and pick.waveform_id.station_code==station_code:
                     pick_markS = pick.time - origin.time
                     plt.vlines(x=pick_markS, ymin=distance-scale*2, ymax=distance+scale*2, color='#FF1493', linewidth=3)
 
+                elif (pick.phase_hint in ('t_max','t_onset') and 
+                  pick.filter_id is not None and  
+                  pick.waveform_id.station_code==station_code): 
+
+                    pick_mark = pick.time - origin.time
+                    if pick.filter_id == filter_ids[0]:
+                        color=colors[0]
+                    elif pick.filter_id == filter_ids[1]:
+                        color=colors[1]
+                    elif pick.filter_id == filter_ids[2]:
+                        color=colors[2]
+
+                    plt.vlines(x=pick_mark, ymin=distance-scale*2, ymax=distance+scale*2, color=color, linewidth=3)
 
 
             # stream_env = stream.select(channel=channel).copy()
@@ -1399,4 +1575,8 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
             #             # don't plot them on top of each other, but shift by 1 each time
             #             # plt.plot(x_time,stream_env[0].data/trace_max+ ii,label=str(pre_filt))
             #             plt.plot(x_time,stream_env[0].data/trace_max,label='{} - {} Hz'.format(pre_filt[1],pre_filt[2]))
-                        
+
+def onclick(event):
+    global xdata
+    xdata = round(event.xdata,1)
+    print('Clicked {} s'.format(xdata))
