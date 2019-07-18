@@ -101,6 +101,9 @@ def find_processed_dir(top_level_dir,year,station):
 def find_seismogram(top_level_dir,starttime,endtime,
   stations=['S12','S14','S15','S16'],channels=['MH1', 'MH2', 'MHZ'], 
   dir_type='pdart_dir'):
+    # TODO add more complex code to get the right days and the 
+    # including if it is early in the morning
+
 
     for station in stations: 
         stream = Stream()
@@ -115,7 +118,16 @@ def find_seismogram(top_level_dir,starttime,endtime,
                 str(starttime.year), starttime.julday)
         filename = os.path.join(dir,filename)
         try:
-            # print('Filename ', filename)
+            stream += read(filename)
+        except Exception as e:
+            print(str(e))
+
+        if dir_type=='processed_dir':
+            dir = find_processed_dir(top_level_dir,starttime.year,station)
+            filename = '*%s.%s.%s.%s.%s.%03d*.gz' % ('XA',station, '*', channel,
+                str(starttime.year), starttime.julday-1)
+        filename = os.path.join(dir,filename)
+        try:
             stream += read(filename)
         except Exception as e:
             print(str(e))
@@ -125,6 +137,7 @@ def find_seismogram(top_level_dir,starttime,endtime,
                 dir = find_processed_dir(top_level_dir,endtime.year,station)
                 filename = '*%s.%s.%s.%s.%s.%03d*.gz' % ('XA',station, '*', channel,
                     str(endtime.year), endtime.julday)
+
             else: 
                 dir = find_dir(top_level_dir,endtime.year,station,channel)
                 filename = '*%s.%s.%s.%s.%s.%03d*.gz' % ('XA',station, '*', channel,
@@ -135,9 +148,7 @@ def find_seismogram(top_level_dir,starttime,endtime,
             except Exception as e:
                 print(str(e))
 
-        # print('Before ', stream)
         stream = stream.trim(starttime=starttime,endtime=endtime)
-        # print('After ', stream)
 
         if stream is not None and len(stream) > 0: 
             for tr in stream: 
@@ -732,9 +743,8 @@ def plot_seismogram_with_envelopes(stream, inv, station_code, catalog, file_out,
             print(event.event_type)
             for desc in event.event_descriptions:
                 print(desc.text)
-            # print('Event: ', event_no, event)
-            # print('{}-{}'.format(station_code, channel))
-            # print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
+            print('{}-{}'.format(station_code, channel))
+            print('Distance: {:.1f} km, Azimuth: {:.1f} deg, Back Azimuth: {:.1f} deg'.format(distance, azimuth_A_B, azimuth_B_A))
 
 
         stream_orig = stream.copy()
@@ -1266,6 +1276,7 @@ def display_envelopes(top_level_dir, event, event_no, inv, catalog, file_out, st
 
     # print('Temporarily changed to 1/2 hour')
     # starttime -= 1800.
+    print('T ', time_before, time_after, starttime) 
     begintime = starttime - time_before
     endtime = starttime + time_after
 
@@ -1413,18 +1424,16 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
     plt.plot(P_arrivals, P_kilometers, color='#4B0082')
     plt.plot(S_arrivals, S_kilometers, color='#FF1493', linestyle='dashed')
 
-    start_no = 1
-    end_no = 2
-
     if end_no is None:
         end_no = len(catalog) + 1
     for i, ev in enumerate(catalog[start_no:end_no]):
         
         if ev.event_type != 'crash':
-            # print('Event is not a crash: ', start_no+i, ev)
+            print('Event is not a crash: ', start_no+i, ev)
             continue
-
-        print('Event: ', start_no+i, ev)
+        else: 
+            print('stuff found ')
+    
         # use the preferred origin if it exists
         origin = ev.preferred_origin()
         if origin is None: 
@@ -1436,6 +1445,7 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
 
         starttime = origin.time - time_before - 60
         endtime = origin.time + time_after + 60
+        
 
         # if origin.time is not None: 
         #     starttime  = origin.time
