@@ -784,12 +784,12 @@ def plot_seismogram_with_envelopes(stream, inv, station_code, catalog, file_out,
                                               color=pick_colors[0], linewidth=2)
 
 
-                    if pick.phase_hint == 'S' and pick.waveform_id.station_code==station_code:
+                    elif pick.phase_hint == 'S' and pick.waveform_id.station_code==station_code:
                         pick_markS = pick.time - begintime - time_before
                         plt.gca().axvline(x=pick_markS, 
                                               color=pick_colors[1], linewidth=2)
 
-                    if (pick.filter_id is not None and 
+                    elif (pick.filter_id is not None and 
                       pick.phase_hint in ('t_max','t_onset') and 
                       pick.waveform_id.station_code==station_code): 
 
@@ -804,6 +804,21 @@ def plot_seismogram_with_envelopes(stream, inv, station_code, catalog, file_out,
                         plt.gca().axvline(x=pick_mark, 
                             color=color, linewidth=2)
 
+                    elif (pick.filter_id is not None and 
+                      pick.phase_hint in ('t_max_lower','t_max_upper') and 
+                      pick.waveform_id.station_code==station_code): 
+
+                        pick_mark = pick.time - begintime - time_before
+                        if pick.filter_id == filter_ids[0]:
+                            color=colors[0]
+                        elif pick.filter_id == filter_ids[1]:
+                            color=colors[1]
+                        elif pick.filter_id == filter_ids[2]:
+                            color=colors[2]
+
+                        plt.gca().axvline(x=pick_mark, 
+                            color=color, linewidth=1, linestyle='dashed')
+
 
             # XXXXXX
 
@@ -811,14 +826,22 @@ def plot_seismogram_with_envelopes(stream, inv, station_code, catalog, file_out,
             while True:
                 print('Left click on t_onset or t_max. Or press return.')
                 cid = fig.canvas.mpl_connect('button_press_event', onclick)
-                input_string = '''Left click on t_onset or t_max.\nSet t_onset and t_max: (to1), (tm1), (to2), (tm2), (to3), (tm3)\nOr press return.'''
+                input_string = '''Left click on t_onset or t_max.
+Set t_onset and t_max: (to1), (tm1), (to2), (tm2), (to3), (tm3)
+Set t_max_lower or t_max_upper: (tl1), (tl2), (tl3), (tu1), (tu2), (tu3)
+Or press return.'''
                 output_str = input(input_string)
-                if output_str in ('to1', 'tm1', 'to2', 'tm2', 'to3', 'tm3'):
+                if output_str in ('to1', 'tm1', 'to2', 'tm2', 'to3', 'tm3',
+                      'tl1', 'tl2', 'tl3', 'tu1', 'tu2', 'tu3'):
                     measurement_type = output_str[0:2]
                     number = int(output_str[2])
                     freq = pre_filt_env[number-1]
-                    plt.gca().axvline(x=xdata,
-                      color=colors[number-1], linewidth=3)
+                    if output_str in ('tl1', 'tl2', 'tl3', 'tu1', 'tu2', 'tu3'):
+                        plt.gca().axvline(x=xdata,
+                          color=colors[number-1], linewidth=1, linestyle='dashed')
+                    else: 
+                        plt.gca().axvline(x=xdata,
+                          color=colors[number-1], linewidth=3)
                     plt.draw()
                     save_pick_to_event(event,output_str,xdata,station_code,begintime,
                       time_before,pre_filt_env)
@@ -889,6 +912,11 @@ def save_pick_to_event(event,output_str,pick_seconds,station_code,begintime,
         phase_hint = 't_onset'
     elif measurement_type == 'tm':
         phase_hint = 't_max'
+    elif measurement_type == 'tl':
+        phase_hint = 't_max_lower'
+    elif measurement_type == 'tu':
+        phase_hint = 't_max_upper'
+
     number = int(output_str[2])
     freq = pre_filt_env[number-1]
     filter_id = filter_ids[number-1] 
@@ -1384,7 +1412,7 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
   dir_type='pdart_dir',pre_filt_main=None,pre_filt_env=None,output='VEL',
   smooth_periods=10,time_before=100,time_after=2000,
   stations=STATION_LIST,channel='MHZ',start_no=0,end_no=None,exclude_list=None,scale=10,
-  xlim=(0,150),ylim=(0,1400),title=None):
+  xlim=None,ylim=(0,1400),title=None):
     """
     View several traces at once for all the artificial impacts.
 
@@ -1530,6 +1558,22 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
 
                     plt.vlines(x=pick_mark, ymin=distance-scale*2, ymax=distance+scale*2, color=color, linewidth=3)
 
+                elif (pick.phase_hint in ('t_max_lower','t_max_lower') and 
+                  pick.filter_id is not None and  
+                  pick.waveform_id.station_code==station_code): 
+
+                    pick_mark = pick.time - origin.time
+                    if pick.filter_id == filter_ids[0]:
+                        color=colors[0]
+                    elif pick.filter_id == filter_ids[1]:
+                        color=colors[1]
+                    elif pick.filter_id == filter_ids[2]:
+                        color=colors[2]
+
+                    plt.vlines(x=pick_mark, ymin=distance-scale*2, 
+                      ymax=distance+scale*2, color=color, linewidth=1,
+                      linestyle='dashed')
+
 
             # stream_env = stream.select(channel=channel).copy()
 
@@ -1549,7 +1593,9 @@ def view_section_with_envelopes(top_level_dir,file,inv_name,
 
     plt.xlabel('Time [s]',labelpad=-5)
     plt.ylabel('Offset [km]')
-    plt.xlim(-time_before,time_after)
+    if xlim is None: 
+        xlim = (-time_before,time_after)
+    plt.xlim(xlim)
     plt.ylim(ylim)
     if title is not None: 
         plt.title(title)
