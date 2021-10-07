@@ -1,0 +1,6 @@
+Station,Date of Deployment ,Latitude [1],Longitude [1],Elevation [2],Azimuth of MH1 component [3][a],Azimuth of MH2 component [3][a],Distance from Lunar Module [3],Location,Distance to S12 [3],Azimuth to S12 [3],Distance to S14 [3],Azimuth to S14 [3],Distance to S15 [3],Azimuth to S15 [3],Distance to S16 [3],Azimuth to S16 [3]
+S11,1969-07-21,0.67416,23.47314,-1929,0,90,16.8,"ALSEP 11, Mare Tranquillitatis, Moon",-,-,-,-,-,-,-,-
+S12,1969-11-19,-3.01084,-23.42456,-1424,180,270,130,"ALSEP 12, Oceanus Procellarum, Moon",-,-,181,276,1188,226,1187,276
+S14,1971-02-05,-3.6445,-17.47753,-1063,0,90,178,"ALSEP 14, Fra Mauro, Moon",181,96,-,-,1095,218,1007,277
+S15,1971-07-31,26.13407,3.62981,-1926,0,90,110,"ALSEP 15, Hadley Rille, Moon",1188,40,1095,33,-,-,1119,342
+S16,1972-04-21,-8.97577,15.49649,7,334.5,64.5,95,"ALSEP 16, Descartes, Moon",1187,100,1007,101,1119,160,-,-
