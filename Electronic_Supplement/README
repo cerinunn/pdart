@@ -1,0 +1,108 @@
+Electronic Supplement to: 
+A New Archive of Apollo's Lunar Seismic Data
+Ceri Nunn, Yosio Nakamura, Sharon Kedar and Mark P. Panning
+
+#########################
+
+Table S1 Station Parameters
+
+station_parameters.csv 
+
+The file contains parameters describing the location of the Apollo seismometers:
+
+Date of Deployment
+Latitude (degrees) [1]
+Longitude (degrees) [1]
+Elevation of the station (meters) [2]
+Azimuth of horizontal X component (in degrees) [3][a]
+Azimuth of horizontal Y component (in degrees)[3][a]
+Distance from the lunar module (meters) [3]
+Location Name
+Distance from Station 12 (km) [3]
+Azimuth to Station 12 (degrees) [3]
+Distance from Station 14 (km) [3]
+Azimuth to Station 14 (degrees) [3]
+Distance from Station 15 (km) [3]
+Azimuth to Station 15 (degrees) [3]
+Distance from Station 16 (km) [3]
+Azimuth to Station 16 (degrees) [3]
+
+[a] Upward ground motion produces positive-going output signal for the vertical
+components. The listed azimuths for the horizontal component seismometers are
+the directions of ground motion that give positive going output signal.
+
+References:
+
+[1] Wagner, R.V., Nelson, D.M., Plescia, J.B., Robinson, M.S., Speyerer, E.J.,
+Mazarico, E., 2017. Coordinates of anthropogenic features on the Moon. Icarus,
+Lunar Reconnaissance Orbiter - Part II 283, 92–103.
+https://doi.org/10.1016/j.icarus.2016.05.011
+
+[2] Featured Sites | Lunar Reconnaissance Orbiter Camera [WWW Document], n.d.
+URL http://www.lroc.asu.edu/featured_sites/ (accessed 11.29.17).
+
+[3] Table 4-1: Lauderdale, W.W., Eichelman, W.F., 1974. Passive Seismic Experiment
+(NASA Experiment S-031), in: Apollo Scientific Experiments Data Handbook.
+
+#########################
+Table S2: Operational Status
+Files are in pdart/OperationalStatus 
+Describes various aspects of the operational status, including whether the instrument was in peaked or flat mode, whether the uplink/downlink was working correctly and whether the instrument was responding to leveling commands. The table was from Bates et al. (1979), and has been restructured to indicate problem duration. We added a code to indicate whether there was an error on the channel (0), when it returns to normal operation (1) or if the message could be interpreted as a warning (2).
+
+
+
+#########################
+Table S3: Command Files 
+Files are in pdart/CalibrationFiles
+The files contain the timing of commands sent to the Apollo stations. Cvtfp are from the PSE tapes and cptw from the work tapes (which were used near the end of the mission).
+
+The following commands were used: 
+ 1 (51): gain change for MHX & MHY
+ 2 (52): gain change for MHZ
+ 3 (53): calibration on/off for SH
+ 4 (54): calibration on/off for MH
+ 5 (55): gain change for SHZ
+ 6 (56): leveling power X motor on/off
+ 7 (57): leveling power Y motor on/off
+ 8 (58): leveling power Z motor on/off
+ 9 (59): uncage arm/fire
+10 (60): leveling direction plus/minus
+11 (61): leveling speed low/high
+12 (62): thermal control mode auto/manual
+13 (65): feedback filter in/out
+14 (66): coarse leveling sensor in/out
+15 (67): leveling mode auto/manual
+
+#########################
+Table S4: Seismometer Operating in Flat Mode
+flat_times.txt 
+
+A table containing the times when the seismometers were operating in flat mode. 
+
+#########################
+Table S5 Ground Stations 
+
+ground_stations.csv
+
+The names and codes of the ground stations which recorded the data on Earth.
+
+[1] Source: Table A8 MSFN Site Identification Code, page A-51 of MSC Internal
+Note: Data processing plan for Apollo lunar surface
+and subsatellite experiments, MSC-04434, July 23, 1971.
+
+[2] The decimal code is used within the location field of the SEED files.
+
+[3] The octal code was recorded on the original tapes.
+
+#########################
+Figure S1 Example Calibration Pulse 
+
+Calibration_pulse.png
+
+The plot shows two example calibration pulses. Generally, a pulse was sent, followed by a pulse in the opposite direction a few minutes later. The example from 1970 was recorded during peak mode, and the example from 1976 in flat mode. Table S3 includes the timing of the calibration pulses.
+
+References: 
+Bates, J.R., Lauderdale, W.W., Kernaghan, H., 1979. ALSEP Termination Report.
+Wagner, R.V., Nelson, D.M., Plescia, J.B., Robinson, M.S., Speyerer, E.J., Mazarico, E., 2017. Coordinates of anthropogenic features on the Moon. Icarus, Lunar Reconnaissance Orbiter - Part II 283, 92–103. https://doi.org/10.1016/j.icarus.2016.05.011
+
+
