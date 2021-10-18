@@ -1,0 +1,32 @@
+File cvtf(p,w)_st.csv contains a list of times when PSE commands were received by Apollo station st. File cvtfp is frim PSE tape files and cptfw is from work tape files.
+
+On each line of the list,
+ column 1: data - datetime of the of the frame in which a PSE command appears in ALSEP command verification word
+ column 2: command - PSE command number
+ column 3: MAP - Message acceptance pulse (MAP) from the verification word (success=1)
+ column 4: date_error - flag, which is set to * when software clock is used, the time string could not be parsed, or the time string is suspected to be in error; otherwise it is set to -
+ column 5: data_error - flag, which is set when sync error is detected for the data frame in which the command verification appears, suggesting that the command verification is suspected to be incorrect
+ columns 6-9: location of the data on tape files, given in tape, file, physical record and logical record numbers. (Tape number 13 for PSE tapes referrs to P & E Supplement tape.)
+
+PSE command numbers (decimal command code, bits 3-9 of command verification word, in parentheses) are as follows:
+ 1 (51): gain change for LPX & LPY
+ 2 (52): gain change for LPZ
+ 3 (53): calibration on/off for SP
+ 4 (54): calibration on/off for LP
+ 5 (55): gain change for SPZ
+ 6 (56): leveling power X motor on/off
+ 7 (57): leveling power Y motor on/off
+ 8 (58): leveling power Z motor on/off
+ 9 (59): uncage arm/fire
+10 (60): leveling direction plul/minus
+11 (61): leveling speed low/high
+12 (62): thermal control mode auto/manual
+13 (65): feedback filter in/out
+14 (66): coarse leveling sensor in/out
+15 (67): leveling mode auto/manual
+
+MAP (bit 10 of command verification word) is set when an error check of received command is successful and the command has been acted upon.
+
+For example, the first line of file cvtp.12:
+1969 323 1430 59.381 -  9 1 -  1   1    3 217
+means that the time of the frame is 1969 day 323 14h:30m:59.381s, no flag set, command No. 9 (uncage arm/fire) has been acted upon, no fag set, and it is found on PSE tape 1, file 1, physical record 3, logical record 217.
