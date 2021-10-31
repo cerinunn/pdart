@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model 
+    href="https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.sch"
+    schematypens="http://purl.oclc.org/dsdl/schematron"?>
+
+<Ingest_LDD 
+    xmlns="http://pds.nasa.gov/pds4/pds/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:pds="http://pds.nasa.gov/pds4/pds/v1"
+    xsi:schemaLocation="http://pds.nasa.gov/pds4/pds/v1
+                        http://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.xsd">
+    <name>Apollo</name>
+    <ldd_version_id>1.0.0.0</ldd_version_id>
+    <dictionary_type>Mission</dictionary_type>
+    <full_name>Jennifer Ward</full_name>
+    <steward_id>geo</steward_id>
+    <namespace_id>apollo</namespace_id>
+    <comment>
+        The Apollo dictionary contains classes that describe aspects of the 
+        Apollo missions and related instruments.
+        
+        Apollo version 1.0.0.0
+        PDS Build 1.16.0.0 (1G00)
+        LDDTool version 13.0.2
+        
+        Built with lddtool -plJ PDS4_Apollo_IngestLDD.xml 
+    </comment>
+    <last_modification_date_time>2021-10-13T00:00</last_modification_date_time>
+
+    <!-- Apollo Mission Dictionary Attributes -->
+    <!-- Definitions of attributes of these Apollo-specific classes: 
+           Observation_Information class
+           Seismic_Parameters class
+             Metadata_Location subclass
+             SEED Equivalent subclass
+             ASCII Equivalent subclass
+               
+	    The attributes are:
+	    
+	    In Observation_Information
+	     product_type
+	    
+	    In Seismic_Parameters
+	     channel
+	     location
+	     Metadata_Location
+	     pse_data_type
+	     sample_count
+	     sampling_rate
+	     SEED_Equivalent
+	     station
+	     
+	    In Metadata_Location
+	     metadata_file_name
+	     pds.Internal_Reference
+	     
+	    In SEED_Equivalent
+	     seed_file_name
+	     pds.Internal_Reference
+	    
+	    In ASCII_Equivalent
+	     ascii_equivalent_file_name
+	     pds.Internal_Reference
+    -->
+    
+    <!-- Begin attribute Definitions for the Observation_Information class -->
+    <DD_Attribute>
+    <name>product_type</name>
+    <version_id>1.0</version_id>
+    <local_identifier>apollo.product_type</local_identifier>
+    <nillable_flag>false</nillable_flag>
+    <submitter_name>Jennifer Ward</submitter_name>
+    <definition>The product_type identifies a group of data products within a collection that have
+      some property in common, such as processing level, resolution, or instrument-specific setting.
+    </definition>
+    <DD_Value_Domain>
+      <enumeration_flag>true</enumeration_flag>
+      <value_data_type>ASCII_Short_String_Collapsed</value_data_type>
+      <!-- Keep enumerated values in alphabetical order to avoid duplicates. -->
+      <DD_Permissible_Value>
+        <value>Dataless-SEED</value>
+        <value_meaning>Apollo PSE product containing seismic metadata in SEED format.</value_meaning>
+      </DD_Permissible_Value>
+      <DD_Permissible_Value>
+        <value>GeoCSV</value>
+        <value_meaning>Apollo PSE product containing seismic data in an ASCII table in GeoCSV format.</value_meaning>
+      </DD_Permissible_Value>
+      <DD_Permissible_Value>
+        <value>Mini-SEED</value>
+        <value_meaning>Apollo PSE product containing seismic data in mini-SEED format.</value_meaning>
+      </DD_Permissible_Value>
+      <DD_Permissible_Value>
+        <value>StationXML</value>
+        <value_meaning>Apollo PSE product containing seismic metadata in StationXML format.</value_meaning>
+      </DD_Permissible_Value>
+    </DD_Value_Domain>
+    </DD_Attribute>
+    <!-- End attribute Definitions for the Observation_Information class -->  
+  
+    <!-- Begin definitions for attributes of the SEISMIC_Parameters class and subclasses -->  
+    
+    <DD_Attribute>
+        <name>ascii_equivalent_file_name</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.ascii_equivalent_file_name</local_identifier>
+        <nillable_flag>false</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>
+            Apollo PSE data products are archived in their native SEED format and in a PDS-compatible ASCII format.
+            The ascii_equivalent_file_name attribute gives the name of the file that is the ASCII equivalent of a SEED format file. 
+        </definition>
+        <DD_Value_Domain>
+            <enumeration_flag>false</enumeration_flag>
+            <value_data_type>ASCII_File_Name</value_data_type>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <DD_Attribute>
+        <name>channel</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.channel</local_identifier>
+        <nillable_flag>false</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>
+             Apollo PSE channel. 
+        </definition>
+        <DD_Value_Domain>
+            <enumeration_flag>true</enumeration_flag>
+            <value_data_type>ASCII_Short_String_Collapsed</value_data_type>
+            <DD_Permissible_Value>
+                <value>ATT</value>
+                <value_meaning>Time the signal was recorded on Earth at the ground station. Time in seconds since the 
+                    beginning of the epoch (1 January 1970). The timing can be negative for early in the mission.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>MH1</value>
+                <value_meaning>Horizontal Component 1 of the mid-period instrument.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>MH2</value>
+                <value_meaning>Horizontal Component 2 of the mid-period instrument.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>MHZ</value>
+                <value_meaning>Vertical Component of the mid-period instrument.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>SHZ</value>
+                <value_meaning>Vertical Component of the short-period instrument</value_meaning>
+            </DD_Permissible_Value>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <DD_Attribute>
+        <name>location</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.location</local_identifier>
+        <nillable_flag>true</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>
+            Apollo PSE location. 
+        </definition>
+        <DD_Value_Domain>
+            <enumeration_flag>true</enumeration_flag>
+            <value_data_type>ASCII_Short_String_Collapsed</value_data_type>
+            <DD_Permissible_Value>
+                <value>00</value>
+                <value_meaning>Peaked response of the mid-period seismometer</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>01</value>
+                <value_meaning>Flat response of the mid-period seismometer</value_meaning>
+            </DD_Permissible_Value>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <DD_Attribute>
+        <name>metadata_file_name</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.metadata_file_name</local_identifier>
+        <nillable_flag>false</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>
+            Apollo PSE observations are stored with the seismic data from the instrument in one file (mini-SEED or
+            GeoCSV format) and the metadata for the measurements in another file (dataless SEED or StationXML format).
+            The metadata_file_name attribute gives the name of the file containing the metadata associated with
+            a given data file.
+        </definition>
+        <DD_Value_Domain>
+            <enumeration_flag>false</enumeration_flag>
+            <value_data_type>ASCII_File_Name</value_data_type>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <DD_Attribute>
+        <name>pse_data_type</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.pse_data_type</local_identifier>
+        <nillable_flag>false</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>Apollo PSE mini-SEED products and their equivalent GeoCSV products contain only seismic data, 
+            and therefore have the data_type "waveform". Apollo PSE dataless SEED products and their equivalent 
+            StationXML products contain only metadata for the seismic data files, and therefore have the 
+            data_type "metadata".
+        </definition>
+        <DD_Value_Domain>
+            <enumeration_flag>true</enumeration_flag>
+            <value_data_type>ASCII_Short_String_Collapsed</value_data_type>
+            <DD_Permissible_Value>
+                <value>metadata</value>
+                <value_meaning>The data product contains only metadata.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>waveform</value>
+                <value_meaning>The data product contains only seismic data.</value_meaning>
+            </DD_Permissible_Value>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <DD_Attribute>
+        <name>sample_count</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.sample_count</local_identifier>
+        <nillable_flag>false</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>Sample_count is the number of samples in a Apollo PSE mini-SEED or GeoCSV product.</definition>
+        <DD_Value_Domain>
+            <enumeration_flag>false</enumeration_flag>
+            <value_data_type>ASCII_Integer</value_data_type>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <DD_Attribute>
+        <name>sampling_rate</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.sampling_rate</local_identifier>
+        <nillable_flag>false</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>Sampling_rate represents the number of samples per second.
+            The sampling rate is nominal, and there is a small variation
+            between the nominal sampling rate and the actual sampling rate, 
+            which can be estimated using the timing trace ATT.
+        </definition>
+        <DD_Value_Domain>
+            <enumeration_flag>false</enumeration_flag>
+            <value_data_type>ASCII_Real</value_data_type>
+            <unit_of_measure_type>Units_of_Frequency</unit_of_measure_type>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <DD_Attribute>
+        <name>seed_file_name</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.seed_file_name</local_identifier>
+        <nillable_flag>false</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>
+            Apollo PSE data products are archived in their native SEED format and in a PDS-compatible ASCII format.
+            The seed_file_name attribute gives the name of the file that is the SEED equivalent of an ASCII data file. 
+        </definition>
+        <DD_Value_Domain>
+            <enumeration_flag>false</enumeration_flag>
+            <value_data_type>ASCII_File_Name</value_data_type>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <DD_Attribute>
+        <name>station</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.station</local_identifier>
+        <nillable_flag>false</nillable_flag>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>
+            Apollo seismic station. 
+        </definition>
+        <DD_Value_Domain>
+            <enumeration_flag>true</enumeration_flag>
+            <value_data_type>ASCII_Short_String_Collapsed</value_data_type>
+            <DD_Permissible_Value>
+                <value>S11</value>
+                <value_meaning>Apollo 11 seismic station.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>S12</value>
+                <value_meaning>Apollo 12 seismic station.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>S14</value>
+                <value_meaning>Apollo 14 seismic station.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>S15</value>
+                <value_meaning>Apollo 15 seismic station.</value_meaning>
+            </DD_Permissible_Value>
+            <DD_Permissible_Value>
+                <value>S16</value>
+                <value_meaning>Apollo 16 seismic station.</value_meaning>
+            </DD_Permissible_Value>
+        </DD_Value_Domain>
+    </DD_Attribute>
+    
+    <!-- End definitions for attributes of the SEISMIC_Parameters class and subclasses -->
+
+    <!-- Begin Class Definitions -->
+    <!-- Observation_Information Class Definition -->
+    <!-- Attributes are in the order required in the label -->
+        
+    <DD_Class>
+        <name>Observation_Information</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.Observation_Information</local_identifier>
+        <submitter_name>GEO</submitter_name>
+        <definition>The Observation_Information class provides information about a science
+            observation.</definition>
+        <abstract_flag>false</abstract_flag>
+        <element_flag>true</element_flag>
+        <DD_Association>
+            <identifier_reference>apollo.product_type</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+    </DD_Class>
+    <!-- End of Observation_Information Class definition -->
+    
+    <!-- Metadata_Location Class Definition -->
+    <!-- Classes and attributes are in the order required in the label -->
+    <DD_Class>
+        <name>Metadata_Location</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.Metadata_Location</local_identifier>
+        <submitter_name>Susan Slavney</submitter_name>
+        <definition>
+            The Metadata_Location class contains attributes that identify
+            and locate the metadata associated with a given Apollo PSE data product.
+        </definition>
+        <abstract_flag>false</abstract_flag>
+        <element_flag>false</element_flag>
+        <DD_Association>
+            <identifier_reference>apollo.metadata_file_name</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Associate_External_Class>
+            <namespace_id>pds</namespace_id>
+            <class_name>Internal_Reference</class_name>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+            <DD_Context_Value_List>
+                <attribute_name>reference_type</attribute_name>
+                <attribute_relative_xpath>reference_type</attribute_relative_xpath>
+                <DD_Permissible_Value>
+                    <value>data_to_metadata</value>
+                    <value_meaning>
+                        The given LID or LIDVID identifies the metadata product
+                        associated with this data product.
+                    </value_meaning>
+                </DD_Permissible_Value>
+            </DD_Context_Value_List>
+        </DD_Associate_External_Class>
+    </DD_Class>
+    <!-- End of Metadata_Location Class Definition -->
+    
+    <!-- ASCII_Equivalent Class Definition -->
+    <!-- Classes and attributes are in the order required in the label -->
+    <DD_Class>
+        <name>ASCII_Equivalent</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.ASCII_Equivalent</local_identifier>
+        <submitter_name>Susan Slavney</submitter_name>
+        <definition>
+            The ASCII_Equivalent class contains attributes that identify
+            and locate the ASCII data product equivalent to a given Apollo PSE SEED data product.
+        </definition>
+        <abstract_flag>false</abstract_flag>
+        <element_flag>false</element_flag>
+        <DD_Association>
+            <identifier_reference>apollo.ascii_equivalent_file_name</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Associate_External_Class>
+            <namespace_id>pds</namespace_id>
+            <class_name>Internal_Reference</class_name>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+            <DD_Context_Value_List>
+                <attribute_name>reference_type</attribute_name>
+                <attribute_relative_xpath>reference_type</attribute_relative_xpath>
+                <DD_Permissible_Value>
+                    <value>seed_to_ascii</value>
+                    <value_meaning>
+                        The given LID or LIDVID identifies the Apollo PSE data product in ASCII format
+                        that is the equivalent of this Apollo PSE data product in SEED format.
+                    </value_meaning>
+                </DD_Permissible_Value>
+            </DD_Context_Value_List>
+        </DD_Associate_External_Class>
+    </DD_Class>
+    <!-- End of ASCII_Equivalent Class Definition -->
+    
+    <!-- SEED_Equivalent Class Definition -->
+    <!-- Classes and attributes are in the order required in the label -->
+    <DD_Class>
+        <name>SEED_Equivalent</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.SEED_Equivalent</local_identifier>
+        <submitter_name>Susan Slavney</submitter_name>
+        <definition>
+            The SEED_Equivalent class contains attributes that identify
+            and locate the SEED data product equivalent to a given Apollo PSE ASCII data product.
+        </definition>
+        <abstract_flag>false</abstract_flag>
+        <element_flag>false</element_flag>
+        <DD_Association>
+            <identifier_reference>apollo.seed_file_name</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Associate_External_Class>
+            <namespace_id>pds</namespace_id>
+            <class_name>Internal_Reference</class_name>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+            <DD_Context_Value_List>
+                <attribute_name>reference_type</attribute_name>
+                <attribute_relative_xpath>reference_type</attribute_relative_xpath>
+                <DD_Permissible_Value>
+                    <value>ascii_to_seed</value>
+                    <value_meaning>
+                        The given LID or LIDVID identifies the Apollo PSE data product in SEED format
+                        that is the equivalent of this Apollo PSE data product in ASCII format.
+                    </value_meaning>
+                </DD_Permissible_Value>
+            </DD_Context_Value_List>
+        </DD_Associate_External_Class>
+    </DD_Class>
+    <!-- End of SEED_Equivalent Class Definition -->
+    
+    <!-- Seismic_Parameters Class Definition -->
+    <!-- Attributes are in the order required in the label -->
+    <DD_Class>
+        <name>Seismic_Parameters</name>
+        <version_id>1.0</version_id>
+        <local_identifier>apollo.Seismic_Parameters</local_identifier>
+        <submitter_name>Jennifer Ward</submitter_name>
+        <definition>
+            Attributes specific to the Apollo Passive Seismic Experiment (PSE) data products. 
+        </definition>
+        <abstract_flag>false</abstract_flag>
+        <element_flag>true</element_flag>
+        <DD_Association>
+            <identifier_reference>apollo.pse_data_type</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Association>
+            <identifier_reference>apollo.Metadata_Location</identifier_reference>
+            <reference_type>component_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Association>
+            <identifier_reference>apollo.ASCII_Equivalent</identifier_reference>
+            <reference_type>component_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Association>
+            <identifier_reference>apollo.SEED_Equivalent</identifier_reference>
+            <reference_type>component_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Association>
+            <identifier_reference>apollo.station</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Association>
+            <identifier_reference>apollo.channel</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Association>
+            <identifier_reference>apollo.location</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Association>
+            <identifier_reference>apollo.sampling_rate</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        <DD_Association>
+            <identifier_reference>apollo.sample_count</identifier_reference>
+            <reference_type>attribute_of</reference_type>
+            <minimum_occurrences>0</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+    </DD_Class>
+    <!-- End of Seismic_Parameters Class definition -->
+    
+    <!-- End of class definitions -->
+        
+</Ingest_LDD>
