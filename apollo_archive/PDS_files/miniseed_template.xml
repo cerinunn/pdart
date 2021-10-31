@@ -1,0 +1,115 @@
+<?xml version='1.0' encoding='utf-8'?>
+<?xml-model 
+    href="https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.sch"
+    schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<?xml-model 
+    href="https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1G00_1000.sch"
+    schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<Product_Native
+  xmlns="http://pds.nasa.gov/pds4/pds/v1"
+  xmlns:apollo="http://pds.nasa.gov/pds4/mission/apollo/v1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://pds.nasa.gov/pds4/pds/v1
+  https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.xsd
+  http://pds.nasa.gov/pds4/mission/apollo/v1
+  https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1G00_1000.xsd">
+
+  <Identification_Area>
+    <logical_identifier>urn:nasa:pds:apollo_pse:data_seed:xa.s16.01.afr.1976.066.1</logical_identifier>
+    <version_id>1.0</version_id>
+    <title>Apollo Passive Seismic Experiment data in MiniSEED format</title>
+    <information_model_version>1.16.0.0</information_model_version>
+    <product_class>Product_Native</product_class>
+    <Modification_History>
+      <Modification_Detail>
+        <modification_date>2021-03-02Z</modification_date>
+        <version_id>1.0</version_id>
+        <description>First release to Planetary Data System</description>
+      </Modification_Detail>
+    </Modification_History>
+  </Identification_Area>
+  <Context_Area>
+    <Time_Coordinates>
+      <start_date_time>1976-03-06T19:39:58.933000Z</start_date_time>
+      <stop_date_time>1976-03-06T20:43:58.178283Z</stop_date_time>
+    </Time_Coordinates>
+    <Investigation_Area>                                                                                                
+      <name>APOLLO 16</name>                                                                                          
+      <type>Mission</type>                                                                                            
+      <Internal_Reference>                                                                                            
+        <lid_reference>urn:nasa:pds:context:investigation:mission.apollo_16</lid_reference>                         
+        <reference_type>data_to_investigation</reference_type>                                                      
+      </Internal_Reference>                                                                                           
+    </Investigation_Area>
+    <Observing_System>                                                                                  
+      <Observing_System_Component>                                                                                    
+        <name>APOLLO 16 LUNAR SURFACE EXPERIMENTS PACKAGE</name>                                                                                      
+        <type>Host</type>                                                                                     
+        <Internal_Reference>                                                                                        
+          <lid_reference>urn:nasa:pds:context:instrument_host:spacecraft.a16a</lid_reference>                      
+          <reference_type>is_instrument_host</reference_type>                                                     
+        </Internal_Reference>                                                                                       
+      </Observing_System_Component>
+      <Observing_System_Component>                                                                                    
+        <name>Apollo 16 Passive Seismic Experiment (PSE)</name>                                                                  
+        <type>Instrument</type>                                                                                     
+        <Internal_Reference>                                                                                        
+          <lid_reference>urn:nasa:pds:context:instrument:pse.a16a</lid_reference>                                  
+          <reference_type>is_instrument</reference_type>                                                          
+        </Internal_Reference>                                                                                       
+      </Observing_System_Component>
+    </Observing_System>
+    <Target_Identification>
+      <name>Moon</name>
+      <type>Satellite</type>
+      <Internal_Reference>                                                                                            
+        <lid_reference>urn:nasa:pds:context:target:satellite.earth.moon</lid_reference>                                      
+        <reference_type>data_to_target</reference_type>                                                             
+      </Internal_Reference>
+    </Target_Identification>
+    <Mission_Area>
+      <apollo:Observation_Information>
+        <apollo:product_type>Mini-SEED</apollo:product_type>
+      </apollo:Observation_Information>
+      <apollo:Seismic_Parameters>
+        <apollo:pse_data_type>waveform</apollo:pse_data_type>
+        <apollo:Metadata_Location>
+          <apollo:metadata_file_name>dataless.xa.2021.001.seed</apollo:metadata_file_name>
+          <Internal_Reference>
+            <lid_reference>urn:nasa:pds:apollo_pse:data_seed:dataless.xa.2021.001</lid_reference>
+            <reference_type>data_to_metadata</reference_type>
+          </Internal_Reference>
+        </apollo:Metadata_Location>
+        <apollo:ASCII_Equivalent>
+          <apollo:ascii_equivalent_file_name>xa.s16.01.afr.1976.066.1.a.csv</apollo:ascii_equivalent_file_name>
+          <Internal_Reference>
+            <lidvid_reference>urn:nasa:pds:apollo_pse:data_table:xa.s16.01.afr.1976.066.1.a::1.0</lidvid_reference>
+            <reference_type>seed_to_ascii</reference_type>
+          </Internal_Reference>
+        </apollo:ASCII_Equivalent>
+        <apollo:station>S16</apollo:station>
+        <apollo:channel>AFR</apollo:channel>
+        <apollo:location></apollo:location>
+        <apollo:sampling_rate unit="Hz">6.625</apollo:sampling_rate>
+        <apollo:sample_count>25436</apollo:sample_count>
+      </apollo:Seismic_Parameters>
+    </Mission_Area>
+  </Context_Area>
+  <Reference_List>
+    <Internal_Reference>
+      <lid_reference>urn:nasa:pds:apollo_pse:document:apollo_pse_description</lid_reference>
+      <reference_type>native_to_archival</reference_type>
+    </Internal_Reference>
+  </Reference_List>
+  <File_Area_Native>
+    <File>
+      <file_name>xa.s16.01.afr.1976.066.1.1.mseed</file_name>
+      <creation_date_time>2021-03-02T03:24:52.141173Z</creation_date_time>
+    </File>
+    <Encoded_Native>
+      <name>Apollo PSE MiniSEED Data</name>
+      <offset unit="byte">0</offset>
+      <encoding_standard_id>SEED 2.4</encoding_standard_id>
+    </Encoded_Native>
+  </File_Area_Native>
+</Product_Native>
