@@ -12,50 +12,70 @@ Import Apollo data to MINISEED
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from future.builtins import *  # NOQA
-from datetime import timedelta
 import os
 import io
 import gzip
 
-from obspy.core.utcdatetime import UTCDateTime
+# from obspy.core.utcdatetime import UTCDateTime
 from urllib.request import Request, build_opener, HTTPError
+import httplib2
+from bs4 import BeautifulSoup, SoupStrainer
 
-SECONDS_PER_DAY = 3600.0 * 24.0
+# use environment env_obspy_downgrade
 
-def download_from_jaxa(
-    base_url='http://darts.jaxa.jp/planet/seismology/apollo/dump/dump/lp/START_TIME/',
-    base_dir='', start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
-    end_time=UTCDateTime('1977-09-30T:21:00.000000Z')):
+def create_links(url, match,base_dir):
 
-    time_interval = timedelta(hours=3)
-    start = start_time
-    end = start_time + time_interval
+    http = httplib2.Http()
+    status, response = http.request(url)
 
-    while start < end_time:
+    links = []
+    for link in BeautifulSoup(response, parseOnlyThese=SoupStrainer('a')):
 
-        # in the last time inteval, download only to the end time
-        if end > end_time:
-            end = end_time
+        if link.has_attr('href'):
+            if link['href'][0:len(match)] == match:
+                links.append(link['href'])
 
-        # name csv outputfile with the start time
-        csv_file = '%s.csv.gz' % start.strftime("%Y-%m-%dT%H:%M:%S")
+    out_filename = os.path.join(base_dir,'links.txt')
+    with open(out_filename, 'w') as f:
+        for link in links:
+            f.write("%s\n" % link)
 
-        # build url for the Jaxa website
-        url = '{}{}/STOP_TIME/{}'.format(base_url,
-          start.strftime("%Y-%m-%dT%H:%M:%S"),
-          end.strftime("%Y-%m-%dT%H:%M:%S"))
-        print (url)
+def read_links(base_url,match,base_dir):
+
+    links = []
+    in_filename = os.path.join(base_dir,'links.txt')
+
+    # if file exists already, we can use it
+    if not os.path.isfile(in_filename):
+        create_links(base_url,match,base_dir)
+
+    with open(in_filename, 'rt') as f:
+        for line in f:
+            links.append(line.rstrip('\n'))
+
+    return links
+
+
+def download_from_jaxa(base_url,match,base_dir):
+
+    links = read_links(base_url,match,base_dir)
+    for filename in links:
+
+        url = "{}/{}".format(base_url,filename)
 
         opener = build_opener()
         code, data = download_url(url, opener,timeout=180, debug=False,
           return_string=True, use_gzip=True)
 
-        with gzip.open(os.path.join(base_dir, csv_file), "wb") as gzip_file:
+        filename = '{}.gz'.format(filename)
+        with gzip.open(os.path.join(base_dir, filename), "wb") as gzip_file:
             gzip_file.write(data)
 
-        # increment the time interval
-        start += time_interval
-        end += time_interval
+        # with open(os.path.join(base_dir, filename), "wb") as filewrite:
+        #     filewrite.write(data)
+
+        # exit()
+
 
     print('Done')
 
@@ -116,3 +136,39 @@ def download_url(url, opener, timeout=10, debug=False,
         print("Downloaded %s with HTTP code: %i" % (url, code))
 
     return code, data
+
+
+# if __name__ == "__main__":
+    # url='http://darts.jaxa.jp/pub/apollo/pse/p11s/'
+    # match='pse.a11'
+    # base_dir='/Users/nunn/lunar_data/PDART_TAPES/S11'
+    #
+    # download_from_jaxa(url,match,base_dir)
+
+    # url='http://darts.jaxa.jp/pub/apollo/pse/p12s/'
+    # match='pse.a12'
+    # base_dir='/Users/nunn/lunar_data/PDART_TAPES/S12'
+    #
+    # download_from_jaxa(url,match,base_dir)
+    #
+    # url='http://darts.jaxa.jp/pub/apollo/pse/p14s/'
+    # match='pse.a14'
+    # base_dir='/Users/nunn/lunar_data/PDART_TAPES/S14'
+    #
+    # download_from_jaxa(url,match,base_dir)
+    #
+    # url='http://darts.jaxa.jp/pub/apollo/pse/p15s/'
+    # match='pse.a15'
+    # base_dir='/Users/nunn/lunar_data/PDART_TAPES/S15'
+    #
+    # download_from_jaxa(url,match,base_dir)
+    #
+    # url='http://darts.jaxa.jp/pub/apollo/pse/p16s/'
+    # match='pse.a16'
+    # base_dir='/Users/nunn/lunar_data/PDART_TAPES/S16'
+    #
+    # url='http://darts.jaxa.jp/pub/apollo/pse/wtns/'
+    # match='wtn'
+    # base_dir='/Users/nunn/lunar_data/PDART_TAPES/work_tapes'
+    #
+    # download_from_jaxa(url,match,base_dir)
