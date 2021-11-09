@@ -179,8 +179,9 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# Temporarily ignomre snippet files 
+# Temporarily ignomre snippet and auth files
 snippet*.py 
+auth.py
 
     © 2021 GitHub, Inc.
     Terms
