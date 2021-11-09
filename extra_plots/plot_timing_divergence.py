@@ -16,7 +16,7 @@ from matplotlib import gridspec
 from pdart.view import stream_from_directory_new
 from obspy.imaging.util import (_set_xaxis_obspy_dates, _id_key, _timestring)
 from matplotlib.dates import date2num
-from pdart.snippet import relative_timing_trace
+from pdart.util import relative_timing_trace
 
     # start_time = UTCDateTime('1971-02-07T00:45:00')
 
@@ -24,28 +24,20 @@ SECONDS_PER_DAY = 3600.0 * 24.0
 DELTA = 0.1509433962
 
 
-
-def plot_timing(top_level_dir=None, start_time=None, timedelta_hours=24, end_time=None, stations=['S12','S14','S15','S16'], out_dir=None, out_filename=None):
-
-
-
-    channels = ['ATT']
+def plot_timing(stream=None, start_time=None, timedelta_hours=24, end_time=None, stations=['S12','S14','S15','S16'], out_dir='../extra_plots_output', out_filename=None, save_fig=True, plot_fig=True):
 
     if end_time is None:
         end_time = start_time + timedelta(hours=timedelta_hours)
 
-    # print('Currently from tmp directory'
-
-    stream = stream_from_directory_new(
-      top_level_dir=top_level_dir,
-      start_time=start_time,
-      stations=stations,
-      channels=channels,
-      end_time=end_time)
+    stream=stream.select(channel='ATT').copy()
+    stream.trim(starttime=start_time,endtime=end_time)
 
     relative_timing_trace(stream)
     
+    xmin = time_to_xvalue(start_time)
+    xmax = time_to_xvalue(end_time)
 
+    x_annotate = xmax + (xmax-xmin)*.01
 
     ########
 
@@ -66,9 +58,9 @@ def plot_timing(top_level_dir=None, start_time=None, timedelta_hours=24, end_tim
         trace_S12 = stream_S12[0]
     
         plot_trace(ax0,trace_S12,color=tol_dark_blue,linewidth=3)
-        ax0.annotate(xy=(1.01,0.1), text='S12',
-          fontsize=13, horizontalalignment="left", verticalalignment="top",
-          xycoords="axes fraction", color=tol_dark_blue, annotation_clip=False)
+        ax0.annotate('S12', xy=(x_annotate,trace_S12.data[-1]),
+          fontsize=13, horizontalalignment="left", verticalalignment="center",
+          xycoords="data", color=tol_dark_blue, annotation_clip=False)
 
         ax0.set_title('Divergence between Sample Time and Timestamp', fontsize=16)
         # ax0.set_ylim(-1,5.5)
@@ -79,46 +71,61 @@ def plot_timing(top_level_dir=None, start_time=None, timedelta_hours=24, end_tim
         trace_S14 = stream_S14[0]
 
         plot_trace(ax0,trace_S14,color=tol_green,linewidth=3)
-        ax0.annotate(xy=(1.01,0.92), text='S14',
-          fontsize=13, horizontalalignment="left", verticalalignment="top", 
-          xycoords="axes fraction", color=tol_green, annotation_clip=False)
+        ax0.annotate('S14', xy=(x_annotate,trace_S14.data[-1]),
+          fontsize=13, horizontalalignment="left", verticalalignment="center", 
+          xycoords="data", color=tol_green, annotation_clip=False)
 
     stream_S15 = stream.select(station='S15')
     if len(stream_S15) > 0:
         trace_S15 = stream_S15[0]
 
         plot_trace(ax0,trace_S15,color=tol_blue_green,linewidth=3)
-        ax0.annotate(xy=(1.01,0.3), text='S15',
-          fontsize=13, horizontalalignment="left", verticalalignment="top",
-          xycoords="axes fraction", color=tol_blue_green, annotation_clip=False)
+        ax0.annotate('S15', xy=(x_annotate,trace_S15.data[-1]),
+          fontsize=13, horizontalalignment="left", verticalalignment="center",
+          xycoords="data", color=tol_blue_green, annotation_clip=False)
 
     stream_S16 = stream.select(station='S16')
     if len(stream_S16) > 0:
         trace_S16 = stream_S16[0]
 
         plot_trace(ax0,trace_S16,color=tol_pale_blue,linewidth=3)
-        ax0.annotate(xy=(1.01,0.7), text='S16',
-          fontsize=13, horizontalalignment="left", verticalalignment="top",
-          xycoords="axes fraction", color=tol_pale_blue, annotation_clip=False)
+        ax0.annotate('S16', xy=(x_annotate,trace_S16.data[-1]),
+          fontsize=13, horizontalalignment="left", verticalalignment="center",
+          xycoords="data", color=tol_pale_blue, annotation_clip=False)
 
     plt.subplots_adjust(left=0.06, right=0.95, top=0.9, bottom=0.12)
 
     plot_set_x_ticks()
-    xmin = time_to_xvalue(start_time)
-    xmax = time_to_xvalue(end_time)
     ax0.set_xlim(xmin, xmax)
 
 
-
-
     if out_filename is None: 
-        out_filename = '../extra_plots_output/timing_divergence_{}XX.png'.format(start_time.strftime('%Y.%j'))
+        out_filename = 'timing_divergence_{}XX.png'.format(start_time.strftime('%Y.%j'))
 
-    if out_dir is not None:
-        out_filename = os.path.join(out_dir,out_filename)
+    out_filename = os.path.join(out_dir,out_filename)
 
-    plt.savefig(out_filename)
-    plt.show()
+
+    if save_fig:
+        plt.savefig(out_filename)
+    if plot_fig:
+        plt.show()
+
+
+def plot_timing_from_dir(top_level_dir=None, start_time=None, timedelta_hours=24, end_time=None, stations=['S12','S14','S15','S16'], out_dir='../extra_plots_output', out_filename=None, save_fig=True, plot_fig=True ):
+
+    if end_time is None:
+        end_time = start_time + timedelta(hours=timedelta_hours)
+
+    # print('Currently from tmp directory'
+
+    stream = stream_from_directory_new(
+      top_level_dir=top_level_dir,
+      start_time=start_time,
+      stations=stations,
+      channels=['ATT'],
+      end_time=end_time)
+
+    plot_timing(stream=stream, start_time=start_time, timedelta_hours=timedelta_hours, end_time=end_time, stations=stations, out_dir=out_dir, out_filename=out_filename, save_fig=save_fig, plot_fig=plot_fig)
 
 # def times_to_minutes(times_in_seconds):
 #     return ((times_in_seconds / 60) - 2)
@@ -166,8 +173,12 @@ def plot_set_x_ticks(type='normal', *args, **kwargs):  # @UnusedVariable
 def times_to_seconds(times_in_seconds):
     return (times_in_seconds - 120)
 
+
+
+
+
+
 if __name__ == "__main__":
     # plot for the paper
-    plot_timing(top_level_dir='/Users/cnunn/lunar_data/PDART',start_time=UTCDateTime('1973-06-30T00:00:00.00000Z'))
-
+    plot_timing_from_dir(top_level_dir='/Users/cnunn/lunar_data/PDART',start_time=UTCDateTime('1973-06-30T00:00:00.00000Z'))
 
