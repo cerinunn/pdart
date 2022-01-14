@@ -71,10 +71,6 @@ from collections import OrderedDict
 from obspy.core.utcdatetime import UTCDateTime
 from obspy.core import Stream, Trace, Stats, read
 
-import natsort # if required, install with pip install natsort
-
-
-from pdart.initial_checks import _est_frame
 # from pdart.save_24_hours import update_starttimes
 import pdart.config as config
 # from pdart.csv_import_work_tapes import find_output_dir, make_output_dir, make_filelist
