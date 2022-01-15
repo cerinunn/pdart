@@ -120,8 +120,8 @@ def timing_correction(stream,correction_time,interpolate=False):
             for tr in stream.select(station=station):
                 tr.stats.starttime += time_diff
 
-def relative_timing_trace(stream,remove_original=True):
-    """Snippet to display the timing traces as relative traces  
+def relative_timing_stream(stream,remove_original=True):
+    """Snippet to change the stream to include relative timing traces  
 
     The data sampler had small variations in sampling rate, and also variations
     between the different stations. 
@@ -149,9 +149,54 @@ def relative_timing_trace(stream,remove_original=True):
                 tr_divergence = tr.copy()
                 stream.append(tr_divergence)
             tr_divergence.stats.channel = 'ATT_DIVERGENCE'
+            # get the mask if there is one (when there are data gaps)
+            if isinstance(tr_divergence.data, np.ma.MaskedArray):
+                mask = np.ma.getmask(tr_divergence.data)
+            else:
+                mask = None
+
+            # find the relative time
             timestamp0 = tr_divergence.stats.starttime.timestamp
             timestamp_arr = timestamp0 + np.arange(0,len(tr_divergence.data))* DELTA*4
             tr_divergence.data = timestamp_arr - tr.data
+
+            # apply the mask back, if necessary
+            if mask is not None:
+                tr_divergence.data = ma.array(tr_divergence.data, mask=mask)
+            
+
+def relative_timing_trace(trace):
+    """Snippet to calculate a relative timing (ATT) trace
+
+    The data sampler had small variations in sampling rate, and also variations
+    between the different stations. 
+    The timestamp
+    is recorded on the ATT trace. The data are provided as contiuous 
+    traces with a nominal sampling rate. Over the course of the day 
+    there will be a divergence between the recorded timestamp and the 
+    sample time. The new trace contains sample time minus timestamp and the 
+    channel is called 'ATT_DIVERGENCE'. It is also a lot easier to see 
+    variations in the timing the trace in this format.
+
+    :type trace: :class:`~obspy.core.Trace` 
+    :param trace: A timing trace
+    """
+    if trace.stats.channel == 'ATT' :
+        trace.stats.channel = 'ATT_DIVERGENCE'
+        # get the mask if there is one (when there are data gaps)
+        if isinstance(trace.data, np.ma.MaskedArray):
+            mask = np.ma.getmask(trace.data)
+        else:
+            mask = None
+
+        # find the relative time
+        timestamp0 = trace.stats.starttime.timestamp
+        timestamp_arr = timestamp0 + np.arange(0,len(trace.data))* DELTA*4
+        trace.data = timestamp_arr - trace.data
+
+        # apply the mask back, if necessary
+        if mask is not None:
+            trace.data = ma.array(trace.data, mask=mask)    
 
 def remove_negative_ones(stream):
     """Snippet to remove the -1 values in the data traces. 
