@@ -16,7 +16,7 @@ from matplotlib import gridspec
 from pdart.view import stream_from_directory_new
 from obspy.imaging.util import (_set_xaxis_obspy_dates, _id_key, _timestring)
 from matplotlib.dates import date2num
-from pdart.util import relative_timing_trace
+from pdart.util import relative_timing_stream
 
     # start_time = UTCDateTime('1971-02-07T00:45:00')
 
@@ -32,7 +32,7 @@ def plot_timing(stream=None, start_time=None, timedelta_hours=24, end_time=None,
     stream=stream.select(channel='ATT').copy()
     stream.trim(starttime=start_time,endtime=end_time)
 
-    relative_timing_trace(stream)
+    relative_timing_stream(stream)
     
     xmin = time_to_xvalue(start_time)
     xmax = time_to_xvalue(end_time)
