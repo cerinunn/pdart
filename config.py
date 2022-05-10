@@ -17,6 +17,19 @@ last_orig_idx=None
 combine_ground_stations=True
 clean_spikes=True
 view_corrected_traces = False
+fix_clock_error=True
+fix_jump_error=True
+exclude_masked_sections=True
+potentially_suspect = 0
+rejected = 0 
+valid_end_frame = 0
+valid_end_timestamp = 0
+valid_end_time_index = 0
+valid_end_delta4 = 0
+clock_end_frame = 0
+clock_end_timestamp = 0
+clock_end_time_index = 0
+clock_end_delta4 = 0
 # this gets used to check that the new day starts on the right
 # station and right time
 # if the list doesn't apply for the previous day, no action is taken, 

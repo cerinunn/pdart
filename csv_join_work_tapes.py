@@ -37,13 +37,14 @@ from obspy.core import Stream, Trace, Stats, read
 
 # from pdart.save_24_hours import update_starttimes
 import pdart.config as config
+from pdart.util import relative_timing_trace
 # from pdart.csv_import_work_tapes import find_output_dir, make_output_dir, make_filelist
 # import matplotlib.pyplot as plt
 
 # Qt5Agg seems to work best on Mac - try 'TkAgg' if that works for you
 # put this after the other imports, otherwise it can be overridden
 import matplotlib  
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
 from pdart.util import maximize_plot
@@ -52,6 +53,14 @@ global total
 total = 0
 global gst_total
 gst_total = 0
+global df_manual_jump_correction
+df_manual_jump_correction = None
+global df_manual_clock_correction 
+df_manual_clock_correction = None
+global df_manual_exclude
+df_manual_exclude = None
+global manual_only
+manual_only = False
 
 # global DELTA
 DELTA = 0.1509433962
@@ -69,7 +78,9 @@ TEST_SHIFT = 20
 
 # max percent error is based on 12 s in 24 hours (the maximum 
 # time lag seen so far)
-MAX_PERCENT_ERROR= 0.014
+# MAX_PERCENT_ERROR= 0.014
+# try divergence that's a bit more realistic 0.5 seconds in 24 hours 
+MAX_PERCENT_ERROR= 0.0005
 
 # global first_record
 # global last_record
@@ -110,6 +121,116 @@ MAX_PERCENT_ERROR= 0.014
 # unmerged streams will be saved in the following format   s12/1976/229/xa.s12.3.mh1.1976.068.0.mseed where the ground station is also included 
 '''
 
+
+def call_csv_join_work_tapes_manual(
+    processed_dir='.',
+    join_dir='.',
+    log_dir='.',
+    wildcard_style='*',
+    year_start=None,
+    year_end=None,
+    day_start=None,
+    day_end=None,
+    stations=['S11','S12','S14','S15','S16'],
+    manual_clock_correction=None,
+    manual_jump_correction=None,
+    manual_exclude=None,
+    # logging_level=logging.DEBUG
+    logging_level=logging.INFO,
+    test=False, # these parameters are used for testing ONLY
+    test_start=None, # these parameters are used for testing ONLY
+    test_end=None, # these parameters are used for testing ONLY
+    test_framejump=40, # these parameters are used for testing ONLY
+    test_cutout_start=None,  # these parameters are used for testing ONLY
+    test_cutout_end=None,  # these parameters are used for testing ONLY    
+    ):
+
+    '''
+    Make files which are joined into the right days
+    Calls csv_import_work_tapes()
+    '''
+    global manual_only
+    manual_only=True
+
+    # note that these call the files again if the same station and day  
+    # combination is called more than once
+    # if this is used a lot, it should be rewritten
+
+    global df_manual_clock_correction
+    if manual_clock_correction is not None:
+        df_manual_clock_correction = pd.read_csv(manual_clock_correction, dtype=str, comment='#')
+        for f in df_manual_clock_correction.filename:
+            # wtn.16.6.S14.3.1977.140.11_30_27_769000.csv.gz
+            # pse.a16.4.93.S16.1.1974.001.00_00_00_300000.csv.gz
+            lst = f.split('.')
+            julday = lst[-4]
+            year = lst[-5]
+            station = lst[-7]
+            call_csv_join_work_tapes(
+                processed_dir=processed_dir,
+                join_dir=join_dir,
+                log_dir=log_dir,
+                year_start=int(year),
+                year_end=int(year),
+                day_start=int(julday),
+                day_end=int(julday),
+                stations=[station],
+                manual_clock_correction=manual_clock_correction,
+                manual_jump_correction=manual_jump_correction
+            )
+
+    global df_manual_jump_correction
+    if manual_jump_correction is not None:
+        df_manual_jump_correction = pd.read_csv(manual_jump_correction, dtype=str, comment='#')
+        # if len():
+        df_manual_jump_correction['correction'] = df_manual_jump_correction['correction'].astype(float)
+        for f in df_manual_jump_correction.filename:
+            # wtn.16.6.S14.3.1977.140.11_30_27_769000.csv.gz
+            # pse.a16.4.93.S16.1.1974.001.00_00_00_300000.csv.gz
+            lst = f.split('.')
+            julday = lst[-4]
+            year = lst[-5]
+            station = lst[-7]
+            call_csv_join_work_tapes(
+                processed_dir=processed_dir,
+                join_dir=join_dir,
+                log_dir=log_dir,
+                year_start=int(year),
+                year_end=int(year),
+                day_start=int(julday),
+                day_end=int(julday),
+                stations=[station],
+                manual_clock_correction=manual_clock_correction,
+                manual_jump_correction=manual_jump_correction
+            )
+
+    global df_manual_exclude
+    if manual_exclude is not None:
+        df_manual_exclude = pd.read_csv(manual_exclude, dtype=str, comment='#')
+        # if len():
+        for f in df_manual_exclude.filename:
+            # wtn.16.6.S14.3.1977.140.11_30_27_769000.csv.gz
+            # pse.a16.4.93.S16.1.1974.001.00_00_00_300000.csv.gz
+            lst = f.split('.')
+            julday = lst[-4]
+            year = lst[-5]
+            station = lst[-7]
+            call_csv_join_work_tapes(
+                processed_dir=processed_dir,
+                join_dir=join_dir,
+                log_dir=log_dir,
+                year_start=int(year),
+                year_end=int(year),
+                day_start=int(julday),
+                day_end=int(julday),
+                stations=[station],
+                manual_clock_correction=manual_clock_correction,
+                manual_jump_correction=manual_jump_correction,
+                manual_exclude=manual_exclude
+            )
+
+
+
 def call_csv_join_work_tapes(
     processed_dir='.',
     join_dir='.',
@@ -120,6 +241,9 @@ def call_csv_join_work_tapes(
     day_start=None,
     day_end=None,
     stations=['S11','S12','S14','S15','S16'],
+    manual_clock_correction=None,
+    manual_jump_correction=None,
+    manual_exclude=None,
     # logging_level=logging.DEBUG
     logging_level=logging.INFO,
     test=False, # these parameters are used for testing ONLY
@@ -135,13 +259,32 @@ def call_csv_join_work_tapes(
     Calls csv_import_work_tapes()
     '''
 
+    global df_manual_clock_correction
+    if manual_clock_correction is not None:
+        df_manual_clock_correction = pd.read_csv(manual_clock_correction, dtype=str, comment='#')
+
+    global df_manual_jump_correction
+    if manual_jump_correction is not None:
+        df_manual_jump_correction = pd.read_csv(manual_jump_correction, dtype=str, comment='#')
+        # if len():
+        df_manual_jump_correction['correction'] = df_manual_jump_correction['correction'].astype(float)
+
+    global df_manual_exclude
+    if manual_exclude is not None:
+        df_manual_exclude = pd.read_csv(manual_exclude, dtype=str, comment='#')
+
+
     # TODO -fix these date ranges - they are not quite right 
     # if no filenames have been passed, then look for them 
     for year in range(year_start,year_end+1):
         for day in range(day_start,day_end+1):
 
             if config.combine_ground_stations == True:
-                log_filename = 'join.{}.{}.log'.format(year,day)
+                if manual_only == False: 
+                    log_filename = 'join.{}.{}.log'.format(year,day)
+                else:
+                    sta = stations[0]
+                    log_filename = 'join_manual.{}.{}.{}.log'.format(year,day,sta)
             else:
                 log_filename = 'ground_stations.{}.{}.log'.format(year,day)    
             log_filename = os.path.join(log_dir,log_filename)
@@ -156,7 +299,15 @@ def call_csv_join_work_tapes(
     # /Users/cnunn/lunar_data/PDART_PROCESSED_WORK_TAPES/wtn.1.6.S12.6.1976.063.00_00_00_199000.csv.gz
     # /Users/cnunn/lunar_data/PDART_PROCESSED_WORK_TAPES/wtn.1.6.S12.601.1976.063.00_32_59_285000.csv.gz
 
-            logging.info('#########')                                   
+            logging.info('#########')   
+
+            logging.info('config.combine_ground_stations={}'.format(config.combine_ground_stations))  
+            logging.info('config.clean_spikes={}'.format(config.clean_spikes))  
+            logging.info('config.view_corrected_traces={}'.format(config.view_corrected_traces))  
+            logging.info('config.fix_clock_error={}'.format(config.fix_clock_error))  
+            logging.info('config.fix_jump_error={}'.format(config.fix_jump_error))
+            logging.info('config.exclude_masked_sections={}'.format(config.exclude_masked_sections))
+                                
             for station in stations:
                 df_list = []
                 # wildcard_filename = 'pse.a16.1.83.S16.12.1972.195.00_00_00_159000*XXX.csv.gz'
@@ -164,12 +315,57 @@ def call_csv_join_work_tapes(
                 wildcard_filename = '{}.*.*.{}.*.{}.{:03}.*.csv.gz'.format(wildcard_style,station,year,day)
                 print('wildcard filename ', processed_dir, wildcard_filename)
                 # read in each of the csv files for the station
+                # for filename in glob.glob('/Users/cnunn/python_packages/pdart/examples/test.csv'):
                 for filename in glob.glob(os.path.join(processed_dir,wildcard_filename)):
+
+                    # 
+                    # temporary
+                    # if os.path.basename(filename) not in ('wtn.1.3.S12.1.1976.061.13_29_58_945000.csv.gz'):
+                    #     continue
+
+
+                    exclude = manual_exclusion(filename)
+                    if exclude:
+                        logging.info('WARNING: manually excluding file {}'.format(filename))
+                        continue
+
+
+
+# wtn.15.14.S15.7.1977.120.00_00_00_428000.csv.gz
+# wtn.15.14.S15.1.1977.120.01_54_00_296000.csv.gz
+# wtn.15.14.S15.11.1977.120.03_00_17_786000.csv.gz
+# wtn.15.14.S15.8.1977.120.03_25_41_044000.csv.gz
+# wtn.15.15.S15.8.1977.120.06_22_34_958000.csv.gz
+# wtn.15.15.S15.4.1977.120.07_50_50_438000.csv.gz
+# wtn.15.15.S15.5.1977.120.10_18_09_924000.csv.gz
+# wtn.15.15.S15.1.1977.120.17_08_59_828000.csv.gz
+# wtn.15.16.S15.1.1977.120.19_00_48_689000.csv.gz
+# wtn.15.16.S15.7.1977.120.19_49_59_818000.csv.gz
+                    #temp ones
+                    # if os.path.basename(filename) in ('wtn.15.15.S15.5.1977.120.10_18_09_924000.csv.gz'):
+                    #     continue
+
+
+        
+                    # if os.path.basename(filename) not in ('wtn.15.15.S15.8.1977.120.06_22_34_958000.csv.gz', 
+                    #     'wtn.15.15.S15.1.1977.120.17_08_59_828000.csv.gz'):
+                    #     continue
+
+                    # # temp ones: 
+                    # if os.path.basename(filename) in ('wtn.18.37.S12.3.1977.203.17_35_29_067000.csv.gz', 
+                    #    'wtn.18.38.S12.3.1977.203.17_49_36_777000.csv.gz'):
+                    #     continue
+
+
                     # print(filename)
                     
                     # if filename not in ('/Users/cnunn/lunar_data/PDART_PROCESSED_WORK_TAPES/wtn.1.6.S12.6.1976.063.00_00_00_199000.csv.gz',
                     #     '/Users/cnunn/lunar_data/PDART_PROCESSED_WORK_TAPES/wtn.1.6.S12.601.1976.063.00_32_59_285000.csv.gz',
                     #     '/Users/cnunn/lunar_data/PDART_PROCESSED_WORK_TAPES/wtn.1.6.S12.9.1976.063.05_35_56_339000.csv.gz'):
+
+                    # 400/800 error
+                    # if filename not in ('/Users/cnunn/lunar_data/PDART_PROCESSED/wtn.9.17.S12.4.1976.299.00_00_00_034000.csv.gz'):
+                    #     continue
 
                     # if filename not in (
                     #     '/Users/cnunn/lunar_data/PDART_PROCESSED_WORK_TAPES/wtn.1.19.S12.6.1976.069.05_08_48_484000.csv.gz',
@@ -182,9 +378,60 @@ def call_csv_join_work_tapes(
                     #     continue
                     # if os.path.basename(filename) not in ['wtn.3.18.S16.5.1976.128.03_19_59_792000.csv.gz','wtn.3.18.S16.8.1976.128.04_08_31_629000.csv.gz']:
                     #     continue
+
+                    # if os.path.basename(filename) in ['pse.a16.2.156.S16.3.1973.072.14_48_48_238000.csv.gz']:
+                    #     continue
+
+                    # if os.path.basename(filename) not in ('wtn.9.17.S12.4.1976.299.00_00_00_034000.csv.gz'):
+                    #     continue
+
+                    # if os.path.basename(filename) not in ['pse.a16.2.156.S16.3.1973.072.16_35_39_642000.csv.gz','pse.a16.2.156.S16.9.1973.072.17_09_12_466000.csv.gz' ]:
+                    #     continue
+
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a12.6.208.S12.9.1973.073.18_48_36_308000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a12.6.208.S12.9.1973.073.19_22_27_103000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a12.6.208.S12.9.1973.073.20_08_57_714000.csv.gz
+
+
+#                     if os.path.basename(filename) in ['pse.a12.6.208.S12.9.1973.073.20_08_57_714000.csv.gz','pse.a12.6.208.S12.9.1973.073.19_22_27_103000.csv.gz','pse.a12.6.208.S12.9.1973.073.18_48_36_308000.csv.gz','pse.a12.6.208.S12.9.1973.073.18_35_03_360000.csv.gz','wtn.11.20.S12.700.1976.001.00_04_27_250000.csv.gz',
+# # 'pse.a12.10.78.S12.4.1976.001.00_52_41_266000.csv.gz'
+#                         ]:
+#                         continue
+
+                    # if os.path.basename(filename) in ['pse.a16.5.37.S16.3.1974.123.15_58_30_103000.csv.gz']:
+                    #     continue
+
+
+
+
+
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.2.156.S16.9.1973.072.17_09_12_466000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.2.157.S16.9.1973.072.20_20_00_361000.csv.gz
+
                     if 'dropped' not in filename:
                         try: 
                             gzip_filename = filename
+
+                            # if gzip_filename not in ('/Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.3.1973.184.07_34_51_966000.csv.gz', '/Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.3.1973.184.09_00_45_934000.csv.gz','/Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.9.1973.184.11_52_07_470000.csv.gz'):
+                            #     continue
+
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.3.1973.184.07_34_51_966000.csv.gz
+
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.4.1973.184.00_00_00_011000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.4.1973.184.01_40_49_591000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.4.1973.184.01_54_52_436000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.4.1973.184.02_34_22_154000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.0.1973.184.06_49_03_100000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.3.1973.184.07_34_51_966000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.11.1973.184.15_46_40_917000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.91.S16.11.1973.184.20_20_00_595000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.4.1973.184.00_06_40_902000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.4.1973.184.00_01_05_820000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.91.S16.4.1973.184.23_34_42_581000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.9.1973.184.11_52_07_470000.csv.gz
+# /Users/cnunn/lunar_data/PDART_PROCESSED/pse.a16.3.90.S16.3.1973.184.09_00_45_934000.csv.gz
+
+
                             logging.info(gzip_filename)
                             df_list = read_file(filename,df_list,logging_level,join_dir,log_dir)
                         except Exception as e:
@@ -194,8 +441,9 @@ def call_csv_join_work_tapes(
                             print('Warning, continuing')
                             # print('Not continuing')
 
-                # XXXX
                 logging.info('#########')
+
+
                 if len(df_list) > 0:
                     # if test:
                     #     print('Testing dealing with problems with the trace. Start by moving the frame count by 40.')
@@ -250,7 +498,7 @@ def call_csv_join_work_tapes(
 #     config.last_timestamp_S16=None
 #     config.last_ground_station_S16=None
 
-def read_file(gzip_filename,df_list,logging_level=logging.INFO,join_dir='.',log_dir='.',
+def read_file(gzip_filename,df_list,end_logging_level=logging.INFO,join_dir='.',log_dir='.',
   df=None # only used for test purposes
 ):
 
@@ -267,18 +515,135 @@ def read_file(gzip_filename,df_list,logging_level=logging.INFO,join_dir='.',log_
 
     df = initial_cleanup(df)
 
+    # leap second correction 
+    df = leap_correction(df,gzip_filename)
+
+    df = manual_correction(df,gzip_filename)
+
+    # df_end_frames = calculate_end_frames(df,df_end_frames=df_end_frames)
+
+    # calculate the delta4 for the segment 
+    segment_delta4, segment_est_divergence = calculate_segment_delta4(df)
+    
+#     if os.path.basename(gzip_filename) in ['pse.a15.4.65.S15.11.1973.074.01_05_34_360000.csv.gz']:
+# # 'pse.a16.5.37.S16.3.1974.123.15_58_30_103000.csv.gz']:
+#         print('yes')
+#         df.clock_flag = 1
+
+
     # get some details about the data 
     starttime = UTCDateTime(df.corr_timestamp.iloc[0])
     endtime = UTCDateTime(df.corr_timestamp.iloc[-1])
+    start_clock_flag = df.clock_flag.iloc[0]
+    end_clock_flag = df.clock_flag.iloc[-1]
     orig_station = df.orig_station.iloc[0]
     orig_ground_station = df.orig_ground_station.iloc[0]
     corr_ground_station = df.corr_ground_station.iloc[0]
+
     attempt_merge = True
-    
+
+    df_dict = {'starttime' : starttime, 'endtime' : endtime, 
+      'orig_station' : orig_station , 'orig_ground_station' : orig_ground_station, 
+      'corr_ground_station' : corr_ground_station, 'df' : df, 
+      'attempt_merge' : attempt_merge, 'segment_delta4' : segment_delta4,
+      'segment_est_divergence' : segment_est_divergence, 'gzip_filename' : gzip_filename}
     # make a list of the dataframes
-    df_list.append([starttime, endtime, orig_station,orig_ground_station, corr_ground_station, df, attempt_merge])
+    df_list.append(df_dict)
 
     return df_list
+
+def manual_exclusion(gzip_filename):
+    exclude = False
+    if df_manual_exclude is not None: 
+        if len(df_manual_exclude) > 0:
+            idx_list = df_manual_exclude[df_manual_exclude['filename'] == os.path.basename(gzip_filename)].index.tolist()
+            if len(idx_list) > 0: 
+                exclude = True
+
+    return exclude
+
+def manual_correction(df,gzip_filename):
+    if df_manual_jump_correction is not None: 
+        
+        if len(df_manual_jump_correction) > 0: 
+            idx_list = df_manual_jump_correction[df_manual_jump_correction['filename'] == os.path.basename(gzip_filename)].index.tolist()
+            if len(idx_list) > 0:
+                
+                idx = idx_list[0]
+
+                correction = df_manual_jump_correction.correction.iloc[idx]
+
+                start_timetamp = df['orig_timestamp'].iloc[0]
+                end_timestamp = df['orig_timestamp'].iloc[-1]
+
+                logging.info('WARNING: corrected tapehead jump from original start timestamp {} to original end timestamp {} correction {:.01f} s [manual correction]'.format(start_timetamp,end_timestamp,correction))
+
+                df['corr_timestamp'] = df['corr_timestamp'] - pd.Timedelta(correction, unit='seconds')
+                df['orig_timestamp'] = df['orig_timestamp'] - pd.Timedelta(correction, unit='seconds')
+
+                # may need to drop the first couple of records 
+                to_drop = []
+
+                julday = UTCDateTime(start_timetamp).julday
+                if UTCDateTime(df.corr_timestamp.iloc[0]).julday != julday:
+                    to_drop.append(0)
+                if UTCDateTime(df.corr_timestamp.iloc[1]).julday != julday:
+                    to_drop.append(1)
+                if len(to_drop) > 0: 
+                    df.drop(df.index[to_drop],inplace=True)
+                    df.reset_index(inplace=True,drop=True)
+                        
+            # logging.info()
+
+
+        # TODO add the correction thats been made manually to the log 
+    if df_manual_clock_correction is not None: 
+        if len(df_manual_clock_correction) > 0:
+            idx_list = df_manual_clock_correction[df_manual_clock_correction['filename'] == os.path.basename(gzip_filename)].index.tolist()
+            if len(idx_list) > 0: 
+                df.clock_flag = 1
+
+    return df
+
+def leap_correction(df, filename):
+    # make a correction for the leap seconds
+    # The UTC added one second at the end of the year from 1972 to 1979.  
+    # Please look at the wikipedia web site: https://en.wikipedia.org/wiki/Leap_second.  
+    if os.path.basename(filename) in [
+      'pse.a12.6.136.S12.5.1973.001.00_00_09_330000.csv.gz',
+        'pse.a14.4.166.S14.5.1973.001.00_00_32_799000.csv.gz',
+        'pse.a15.3.162.S15.3.1973.001.03_59_06_810000.csv.gz',
+        'pse.a15.3.162.S15.3.1973.001.00_00_09_103000.csv.gz',
+        'pse.a16.2.85.S16.3.1973.001.00_00_10_037000.csv.gz',
+
+        'pse.a12.7.211.S12.1.1974.001.00_00_06_476000.csv.gz',
+        'pse.a14.7.1.S14.1.1974.001.00_00_11_038000.csv.gz',
+        'pse.a15.6.1.S15.1.1974.001.00_00_10_969000.csv.gz',
+        'pse.a16.4.94.S16.1.1974.001.00_00_11_168000.csv.gz',
+
+
+        'pse.a12.9.1.S12.2.1975.001.00_00_10_703000.csv.gz',
+        'pse.a12.9.1.S12.2.1975.001.03_53_57_272000.csv.gz',
+        'pse.a14.9.7.S14.2.1975.001.00_00_23_815000.csv.gz',
+        'pse.a15.8.7.S15.2.1975.001.00_00_10_932000.csv.gz',
+        'pse.a16.6.100.S16.2.1975.001.00_00_10_238000.csv.gz',
+
+        'pse.a12.10.78.S12.5.1976.001.00_00_09_486000.csv.gz',
+        'pse.a14.11.20.S14.5.1976.001.00_00_12_571000.csv.gz',
+        'pse.a15.10.23.S15.5.1976.001.00_00_07_307000.csv.gz',
+        'pse.a16.8.116.S16.5.1976.001.00_00_12_276000.csv.gz',
+
+        'wtn.11.23.S12.1.1977.001.00_12_50_785000.csv.gz',
+        'wtn.11.23.S14.1.1977.001.00_12_50_927000.csv.gz',
+        'wtn.11.23.S15.1.1977.001.00_12_50_923000.csv.gz',
+        'wtn.11.23.S16.1.1977.001.00_12_50_863000.csv.gz'
+
+]:
+        df['corr_timestamp'] = df['corr_timestamp'] + pd.Timedelta(-1, unit='seconds')
+        df['orig_timestamp'] = df['orig_timestamp'] + pd.Timedelta(-1, unit='seconds')
+
+    return df 
+
 
 def process_list(df_list,join_dir):
 
@@ -286,7 +651,7 @@ def process_list(df_list,join_dir):
     # run through the rest of the dataframes for the station
 
 
-    orig_station = df_list[0][2]
+    orig_station = df_list[0]['orig_station']
     # logging.info('This is the orig station {}'.format(orig_station))
 
     if orig_station == 'S12':
@@ -330,7 +695,8 @@ def process_list(df_list,join_dir):
     #             df_list_station.append(df_list1)
 
     # sort by starttime
-    sorted_df_list = sorted(df_list, key=operator.itemgetter(0))
+    # sorted_df_list = sorted(df_list, key=operator.itemgetter(0))
+    sorted_df_list =  (sorted(df_list, key = lambda i: i['starttime']))
 
     continue_idx = None
     # if last_ground_station_join is not None:
@@ -358,49 +724,121 @@ def process_list(df_list,join_dir):
             # samples, we can continue from the previous trace  
             for i, df_list1 in enumerate(sorted_df_list):
                 if i < continue_idx:
-                    starttime = df_list1[0]
+                    starttime = df_list1['starttime']
 
                     logging.info('WARNING: Deleting two records from trace {}, to continue from trace {}'.format(i, continue_idx))
 
                     # these starttimes are close, so delete the first couple of 
                     # records in this trace 
-                    df = df_list1[5]
+                    df = df_list1['df']
                     df = df.iloc[2:]
                     # reindex
                     df.reset_index(inplace=True,drop=True)
                     new_starttime = UTCDateTime(df.corr_timestamp.iloc[0])
-                    sorted_df_list[i][0] = new_starttime
-                    sorted_df_list[i][5] = df
+                    sorted_df_list[i]['starttime'] = new_starttime
+                    sorted_df_list[i]['df'] = df
                     
             # re-sort by starttime
-            sorted_df_list = sorted(df_list, key=operator.itemgetter(0))
+            # sorted_df_list = sorted(df_list, key=operator.itemgetter(0))
+            sorted_df_list =  (sorted(df_list, key = lambda i: i['starttime']))
             # now it's been re-sorted, the continuing index will be first 
             logging.info('WARNING: Traces resorted')
             continue_idx = 0
 
+    
+
     # sometimes, there's more than one record that could be the start record 
     for i, df_list1 in enumerate(sorted_df_list):
         if i == 0:
-            starttime_i0 = df_list1[0]
+            starttime_i0 = df_list1['starttime']
         if i > 0:
-            starttime = df_list1[0]
+            starttime = df_list1['starttime']
             if starttime < (starttime_i0+ 1):
                 # these starttimes are close, so delete the first couple of 
                 # records in this trace 
-                df = df_list1[5]
+                df = df_list1['df']
                 df = df.iloc[2:]
                 logging.info('WARNING: Deleting two records from trace {}, to continue from initial trace {}'.format(i, 0))
                 # reindex
                 df.reset_index(inplace=True,drop=True)
-                sorted_df_list[i][0] = df.corr_timestamp.iloc[0]
-                sorted_df_list[i][5] = df
+                sorted_df_list[i]['starttime'] = df.corr_timestamp.iloc[0]
+                sorted_df_list[i]['df'] = df
             else:
                 break
 
+
+    # if the first record contains a clock flag, it's not very helpful 
+    for i, df_list1 in enumerate(sorted_df_list):
+        if pd.isna(df_list1['segment_est_divergence']):
+            logging.info('SEVERE: Removing first item from list because it contains clock flags {}'.format(os.path.basename(df_list1['gzip_filename'])))
+            sorted_df_list.pop(i)
+        else:
+            break  
+    
+
+    logging.info('#########')
+
+    # calculate if any records might be suspect (use the Interquartile range)
+    segment_est_divergence = []
+    for x in sorted_df_list:
+        logging.info(os.path.basename(x['gzip_filename']))
+        if pd.notnull(x['segment_est_divergence']):
+            segment_est_divergence.append(x['segment_est_divergence'])
+
+    logging.info('#########')
+
+    segment_est_divergence = np.array(segment_est_divergence)
+
+    sort_data = np.sort(segment_est_divergence)
+
+    Q1 = np.percentile(sort_data, 25, interpolation = 'midpoint') 
+    Q2 = np.percentile(sort_data, 50, interpolation = 'midpoint') 
+    Q3 = np.percentile(sort_data, 75, interpolation = 'midpoint') 
+      
+    # print('Q1 25 percentile of the given data is, ', Q1)
+    # print('Q1 50 percentile of the given data is, ', Q2)
+    # print('Q1 75 percentile of the given data is, ', Q3)
+      
+    IQR = Q3 - Q1 
+    # print('Interquartile range is', IQR)
+
+    low_lim = Q1 - 1.5 * IQR
+    up_lim = Q3 + 1.5 * IQR
+
+
+    config.potentially_suspect = 0
+    for i, df_list1 in enumerate(sorted_df_list):
+        # print(df_list1['segment_est_divergence'])
+        if pd.notnull(df_list1['segment_est_divergence']):
+            if (df_list1['segment_est_divergence'] < low_lim) or (df_list1['segment_est_divergence'] > up_lim):
+                df_list1['reject'] = 'MAYBE'
+                config.potentially_suspect += 1
+            else:
+                df_list1['reject'] = 'NO'
+            if i == 0 and df_list1['reject'] == 'MAYBE':
+                orig_station = df_list1['orig_station']
+                orig_ground_station = df_list1['orig_ground_station']
+                logging.info('SEVERE: Ground station/Station - {} {} First record is potentially suspect. Estimated divergence: {:.02f}'.format(orig_ground_station,orig_station, df_list1['segment_est_divergence']))
+        else:
+            df_list1['reject'] = 'NO'
+    # check last record
+    if df_list1['reject'] == 'MAYBE':
+        orig_station = df_list1['orig_station']
+        orig_ground_station = df_list1['orig_ground_station']
+        logging.info('SEVERE: Ground station/Station - {} {} Last record is potentially suspect. Estimated divergence: {:.02f}'.format(orig_ground_station,orig_station, df_list1['segment_est_divergence']))
+        
+
+    orig_station = df_list1['orig_station']
+    logging.info('INFO: Station - {} Divergence Lower limit={:.01f} Upper limit={:.01f} '.format(orig_station,low_lim,up_lim))
+    if config.potentially_suspect > 0: 
+        logging.info('WARNING: Station - {} {} record(s) are potentially suspect.'.format(orig_station,config.potentially_suspect))
+
+    config.rejected = 0
     starttime0 = None
     index0 = None
     for i, df_list1 in enumerate(sorted_df_list):
-        df = df_list1[5]
+        # df = df_list1['df']
+
         # logging.info(i)
         # logging.info(df.head().to_string())
         # logging.info(df.tail().to_string())
@@ -412,36 +850,41 @@ def process_list(df_list,join_dir):
             later_records(index_no=i,sample_time0=sample_time0,sorted_df_list=sorted_df_list)
                 
         df_list1 = sorted_df_list[i]
-        df = df_list1[5]
-        attempt_merge = df_list1[6]
-        # logging.info('attempt_merge {} {}'.format(i, attempt_merge))
+        df = df_list1['df']
+        if len(df) > 0:
+            attempt_merge = df_list1['attempt_merge']
+            # logging.info('attempt_merge {} {}'.format(i, attempt_merge))
 
-        gaps_7777 = (df['corr_gap_count'] == -7777).sum()
-        if gaps_7777 > 0:
-            orig_station = df_list1[2]
-            orig_ground_station = df_list1[3]
-    # df_list.append([starttime, endtime, orig_station,orig_ground_station, corr_ground_station, df])
-            logging.info('# WARNING: Ground station/Station - {} {} {} frames are reset to zero (-7777 error)'.format(orig_ground_station,orig_station,gaps_7777))
+            gaps_7777 = (df['corr_gap_count'] == -7777).sum()
+            if gaps_7777 > 0:
+        # df_list.append([starttime, endtime, orig_station,orig_ground_station, corr_ground_station, df])
+                orig_station = df_list1['orig_station']
+                orig_ground_station = df_list1['orig_ground_station']
+                logging.info('WARNING: Ground station/Station - {} {} {} frames are reset to zero (-7777 error)'.format(orig_ground_station,orig_station,gaps_7777))
 
-        # 
-        # logging.info('df?')
-        # logging.info(df.head().to_string())
-        # logging.info(df.dtypes.to_string())
+            # # 
+            # logging.info('df?')
+            # logging.info(df.head().to_string())
+            # logging.info(df.dtypes.to_string())
 
+            # import the stream for every record, using the same 
+            # time_index0 and index0
+            stream1 = stream_import(df,sample_time0,index0,attempt_merge)
 
-        # import the stream for every record, using the same 
-        # time_index0 and index0
-        stream1 = stream_import(df,sample_time0,index0,attempt_merge)
+            stream += stream1
 
-        stream += stream1
+    # stream.select(channel='CLK').plot()
+    # print(stream.select(channel='CLK'))
+
 
     # if required, clean the spikes 
     if config.clean_spikes:
         for tr in stream:
-            despike3(tr)
+            rec_spikes_found = despike3(tr)
 
     # if required, merge the streams 
     if config.combine_ground_stations: 
+        # also includes clock correction
         merged_stream = merge_streams(stream)
         stream = merged_stream
 
@@ -526,7 +969,7 @@ def merge_channel_stream(channel_stream,delta):
                         # if it's not overlapping properly, don't try to merge
                         attempt_merge = False
                         tr.stats.attempt_merge = False  
-                        logging.info('INFO: Unable to merge because {:.1f}% of the records are different. {} {}'.format(percent_diff, tr.id, tr.stats.starttime))
+                        logging.info('INFO: Unable to merge because {} ({:.1f}%) of the records are different. {} {}'.format(count_overlap, percent_diff, tr.id, tr.stats.starttime))
                     
             df_result['data_x'] = to_Int64_with_invalid(df_result['data_x'])
             df_result['data_y'] = to_Int64_with_invalid(df_result['data_y'])        
@@ -834,9 +1277,10 @@ def check_trace_mean(trace):
             config.mean_S16_MHZ = new_trace_mean
         elif channel=='SHZ':
             config.mean_S16_SHZ = new_trace_mean
-        
+
 
 def merge_streams(stream):
+    ''' Make a single stream from the many streams'''
 
     merged_stream = Stream()
 
@@ -852,14 +1296,285 @@ def merge_streams(stream):
 
     for channel in ['ATT']:
         channel_stream = stream.select(channel=channel)
+        # logging.info('end timestamp') 
+        # logging.info(channel_stream[0].data[-1])
+        # print('no of traces: ')
+        # print(len(channel_stream))
+        # channel_stream.plot(method='full')
+
+        # merge the traces so that the timing is correct 
+
+
+        # channel_stream.merge(method=1,fill_value=-1.0)
+        # channel_stream.plot(method='full')
+
+
+        # print(np.ma.count_masked(trace.data))
+        # print(trace[1083])
+
+
+
+
+        # print(trace)
+        # fig = trace.plot(handle=True, show=False,method='full')
+        # plt.ylim(-2,2)
+        # plt.show()
+        # print(trace[1083])
+        # mask = np.ma.getmask(trace.data)
+        # truemask = np.where(mask==1)
+        # print(truemask)
+        # # print(truemask[0])
+        # # 
+
+        # for t in range(0,len(truemask)):
+        #     print(t)
+        #     print(truemask[t])
+        #     print(trace.data[truemask[t]])
+
+# filled(np.nan)  
+            
+        # print(len(trace.data))
+        # trace.plot(method='full')
+
+
+        # merge and create a masked trace 
         channel_stream.merge(method=1)
+        # channel_stream1 = channel_stream.copy()
+        # channel_stream1 = channel_stream1.split()
+        # channel_stream1.write('/Users/cnunn/Downloads/merged.MSEED', format='MSEED')
+
+        if len(channel_stream) > 1:
+            logging.info('Too many values in channel stream')
+            raise Exception
+
+        # fig = channel_stream.plot(handle=True, show=False,method='full')
+        # # plt.ylim(-2,2)
+        # plt.show()
+        
+
+        # # mask the trace which has gaps with a fill value
+        # trace = channel_stream[0]
+        # trace.data = trace.data.filled(fill_value=-1.0)
+
+        # fig = trace.plot(handle=True, show=False,method='full')
+        # # plt.ylim(-2,2)
+        # plt.show()
+        # XXXX
+        # print('temp')
+        # channel_stream.write('/Users/cnunn/Downloads/filled.MSEED', format='MSEED')
+        # exit()
+
         merged_stream += channel_stream
+        
+
+    if config.fix_jump_error:
+        for channel in ['DL4']:
+            channel_stream = stream.select(channel=channel)
+            channel_stream.merge(method=1)
+            merged_stream += channel_stream
+
+    if config.fix_clock_error:
+ 
+        for channel in ['CLK']:
+            channel_stream = stream.select(channel=channel)
+            channel_stream.merge(method=1)
+            merged_stream += channel_stream
+
+        # now that the streams are merged, fix the software clock timing if 
+        # possible 
+        tr_CLK = merged_stream.select(channel='CLK')[0]
+
+        # print('v temp')
+        # tr_CLK.data[101] = 1
+        # tr_CLK.data[102] = 1  
+        # tr_CLK.data[103] = 1  
+
+ 
+        # find where the clock flag is set 
+        clk_set = np.where(tr_CLK.data==1)[0]
+        if len(clk_set) > 0:
+            date1 = tr_CLK.stats.starttime
+
+            # print(date1)
+            
+            # mini_stream = Stream()
+            # mini_stream.append(tr_CLK)
+            # mini_stream.
+
+            # logging.info('WARNING: Updating {} timestamps on the timing trace ATT due to a clock error'.format(len(clk_set)))   
+
+            # get the ATT trace
+            tr_ATT = merged_stream.select(channel='ATT')[0]
+
+            # print('v temp')
+            # tr_ATT.data[101] = tr_ATT.data[101] + 4
+            # tr_ATT.data[102] = tr_ATT.data[102] + 4
+            # tr_ATT.data[103] = tr_ATT.data[103] + 4
+            # logging.info(UTCDateTime(tr_ATT.data[-1]))
+            
+
+            # get the mask (data gaps) for the ATT trace
+            mask_ATT = np.ma.getmask(tr_ATT.data)
+            # logging.info('ATT')
+            # logging.info(mask_ATT[-10:])
+            # logging.info(tr_ATT.data[-1])
+
+        
+            # # find where the software clock was set 
+            # tr_CLK = merged_stream.select(channel='CLK')[0]
+            # mask the ATT trace with the software clock 
+            tr_CLK.data = np.ma.masked_where(tr_CLK.data==1,tr_CLK.data)                  # mask any values where the software clock has been set 
+        
+            # get the mask for the CLK trace
+            mask_CLK = np.ma.getmask(tr_CLK.data)
+
+
+
+            # logging.info('CLK')
+            # logging.info(tr_CLK.data[-1])
+            # logging.info(tr_CLK[-10:])
+            # logging.info(mask_CLK[-10:])
+            # 
+
+
+
+            if tr_CLK.data[0] is ma.masked:
+                logging.info('SEVERE: Initial record contains clock flag - {}.{}'.format(date1.year,date1.julday))   
+                logging.info('temp stopping')
+                exit()
+                # # find first one that is OK
+                # C_false = np.where( mask_CLK == False )
+                # if len(C_false[0]) > 0: 
+                #     first_good = C_false[0][0]
+                #     mask_CLK[0:first_good] = False
+                #     tr_CLK.data = ma.masked_array(tr_CLK.data, mask=mask_CLK)
+
+            # logging.info(mask_CLK[-10:])
+            # logging.info(type(mask_CLK[-1]))
+            # logging.info(len(tr_CLK.data))
+                
+                # XXXX
+            C_false = np.where( mask_CLK == False)
+            if len(C_false[0]) > 0: 
+                last_good = C_false[0][-1]
+                first_good = C_false[0][0]
+                # logging.info(last_good)
+                # logging.info('Last date  {}'.format(UTCDateTime(tr_ATT.data[-1])))
+                logging.info('First date without a clock error: {}'.format(UTCDateTime(tr_ATT.data[first_good])))
+                logging.info('Last date without a clock error: {}'.format(UTCDateTime(tr_ATT.data[last_good])))
+
+            if tr_CLK.data[-1] is ma.masked:
+                logging.info('SEVERE: Last record contains clock flag - {}.{}'.format(date1.year,date1.julday)) 
+                # retrieve the valid values 
+
+                C_false = np.where( mask_CLK == False)
+                if len(C_false[0]) > 0: 
+                    last_good = C_false[0][-1]
+                    first_good = C_false[0][0]
+                    # logging.info(last_good)
+                    # logging.info('Last date  {}'.format(UTCDateTime(tr_ATT.data[-1])))
+                    logging.info('First date without a clock error: {}'.format(UTCDateTime(tr_ATT.data[first_good])))
+                    logging.info('Last date without a clock error: {}'.format(UTCDateTime(tr_ATT.data[last_good])))
+                    mask_CLK[last_good:] = False 
+                    tr_CLK.data = ma.masked_array(tr_CLK.data, mask=mask_CLK)
+
+                    # logging.info(mask_CLK.data[-10:])   
+                    
+            
+            logging.info('WARNING: Updating {} timestamps on the timing trace ATT due to a clock error (total={})'.format(len(np.where( mask_CLK == False )[0]), len(tr_ATT) ))
+
+
+
+
+            # [note that the mask doesn't include the empty values, but that doesn't 
+            # matter]
+            # print(tr_ATT)
+            # tr_ATT.data = np.ma.masked_where(np.ma.getmask(mask_CLK), tr_ATT.data)
+            tr_ATT.data= ma.masked_array(tr_ATT.data, mask=mask_CLK)
+            # print(tr_ATT)
+
+            # logging.info(tr_CLK.data[98:110])
+            # logging.info(tr_ATT.data[98:110])
+            # 
+
+
+            # this does the work for interpolating the timing trace - it interpolates the time between good records
+            data_series = pd.Series(tr_ATT.data)
+            data_series.interpolate(method='linear', axis=0, limit=None, inplace=True, limit_direction=None, limit_area='inside', downcast=None)
+            tr_ATT.data=data_series.to_numpy(dtype=np.float64)
+
+            # logging.info(tr_ATT.data[98:110])
+        
+            # apply the original mask to the trace (to remove the data gaps)
+            tr_ATT.data = ma.masked_array(tr_ATT.data, mask=mask_ATT)
+
+            # logging.info(tr_ATT.data[98:110])
+
+            # logging.info('end temp')
+            # logging.info(tr_ATT.data[-1])    
+
+        # no need to save the CLK trace 
+        merged_stream.remove(tr_CLK)
+
+    if config.fix_jump_error:
+        # once the clock error is fixed, also try to fix the 400/800 error 
+
+        tr_DL4 = merged_stream.select(channel='DL4')[0]
+
+        # first make some checks on the overall gradient 
+
+        tr_ATT = merged_stream.select(channel='ATT')[0]
+        # tr_DL4 = merged_stream.select(channel='DL4')[0]
+
+        start_timestamp = UTCDateTime(tr_ATT.data[0])
+        # logging.info(tr_ATT.data[-1])
+        end_timestamp = UTCDateTime(tr_ATT.data[-1])
+        # XXXX
+
+        time_diff = end_timestamp - start_timestamp
+
+        overall_samples = len(tr_ATT)
+        overall_delta4 = time_diff / (overall_samples - 1)
+
+        overall_divergence = tr_ATT.times()[-1] - time_diff 
+
+        # scale to 24 hours - usually not necessary because it's already 
+        # about 24 hours 
+        overall_divergence = overall_divergence * 86400/time_diff
+
+        # logging.info('Numbers {} {} {} {} {} {} {} {}'.format(start_timestamp,end_timestamp,tr_ATT.times()[0],tr_ATT.times()[-1], overall_samples, time_diff, overall_delta4, overall_est_divergence))
+        # 86400*(overall_delta4/DELTA*4)
+
+        logging.info('Overall: {} Overall divergence: {:.02f}'.format(overall_delta4, overall_divergence))
+
+        # station = tr_ATT.stats.station
+        # segment_delta4  = df_end_frames.segment_delta4
+        # segment_est_divergence = df_end_frames.segment_est_divergence
+        # start_timestamp = df_end_frames.start_timestamp
+        # end_timestamp = df_end_frames.end_timestamp
+        # divergent_diff_found = False
+        # for d4, est_d, t1, t2 in zip(segment_delta4, segment_est_divergence, start_timestamp, end_timestamp):
+        #     if d4 is not pd.NA:
+        #         divergence_diff = abs(overall_divergence - est_d)
+        #         # diff = 100* abs(d4 - overall_delta4)/(DELTA*4)
+        #         if divergence_diff > 0.2:
+        #             divergent_diff_found = True
+        #         logging.info('{} {} {} Segment: {} Divergence Difference: {} Segment estimated divergence: {}'.format(station, t1, t2, d4, divergence_diff, est_d))
+
+        # potential_errors = config.potentially_suspect - config.rejected
+        # if potential_errors > 0:
+        #     logging.info('SEVERE: Large difference found for at least one of the gradients')
+        # else:
+        print('no checks before doing the correct shifts')
+        correct_shifts(tr_ATT,tr_DL4)
+
+        # no need to save the tr_DL4 trace 
+        merged_stream.remove(tr_DL4)
 
     if config.combine_ground_stations == False:
         for channel in ['AFR']:
             channel_stream = stream.select(channel=channel)
             channel_stream.merge(method=1)
-
         merged_stream += channel_stream
 
     # record the last entry
@@ -1020,7 +1735,267 @@ def merge_streams(stream):
         #     logging.info('#No MHZ for S16'.format(config.last_frame_S16_MHZ))
 
     return merged_stream
+
+
+def correct_shifts(orig_trace,delta4_trace):
+
+    mask = np.ma.getmask(orig_trace.data)
+
+    divergence_trace = orig_trace.copy() 
+    relative_timing_trace(divergence_trace)
+
+    dict_list = []
+
+    # make an empty dataframe to store the results
+    # df_results = pd.DataFrame(columns = [ 'station', 'start_time', 'end_time', 'correction'])
+
+    station = orig_trace.stats.station 
+
+    # make a dataframe from the original trace 
+    df = pd.DataFrame(data=orig_trace.data, columns=['timestamp_orig'])
+
+    # make a dataframe from the divergent trace (this nicely takes 
+    # care of the masked data, if there are any)
+    df_rel = pd.DataFrame(data=divergence_trace.data, columns=['divergence'])
     
+    # add the second dataframe as a column to the first dataframe 
+    df['divergence'] = df_rel.divergence
+
+    # make a dataframe from the delta4 trace (this nicely takes 
+    # care of the masked data, if there are any)
+    df_dl4 = pd.DataFrame(data=delta4_trace.data, columns=['delta4'])
+
+    # add the third dataframe as a column to the first dataframe 
+    df['delta4'] = df_dl4.delta4
+
+    # # get the details for the gradient for the segment
+    # if start_clock_flag == 0 and end_clock_flag == 0:
+    #     start_timestamp2 = orig_trace.data[-1]  
+    #     end_timestamp2 = orig_trace.data[-1]
+    #     time_diff = end_timestamp2 - end_timestamp1
+    #     overall_delta4 = time_diff / len(df)
+    # else:
+    #     overall_delta4 = pd.NA
+
+    # ZZZZ
+
+
+    # make some checks
+    
+    
+#     # print(df.divergence.isna().sum())
+# 
+    # get the details for the overall gradient
+    x1 = divergence_trace.times()[0]
+    x2 = divergence_trace.times()[-1]
+    y1 = divergence_trace.data[0]
+    y2 = divergence_trace.data[-1]
+
+#         y = m * x + b
+    m = (y1 - y2) / (x1 - x2)
+    b = (x1 * y2 - x2 * y1) / (x1 - x2)
+
+    # make a straight line
+    straight_line = m*divergence_trace.times() + b
+    trace_straight = divergence_trace.copy()
+    trace_straight.data = straight_line
+    df['straight_line'] = trace_straight.data
+
+#     # get the details for the overall gradient
+#     x1 = divergence_trace.times()[0]
+#     x2 = divergence_trace.times()[-1]
+#     y1 = divergence_trace.data[0]
+#     y2 = divergence_trace.data[-1]
+# 
+#     # print(y2)
+
+# #         y = m * x + b
+#     m = (y1 - y2) / (x1 - x2)
+#     b = (x1 * y2 - x2 * y1) / (x1 - x2)
+# 
+#     # make a straight line
+#     straight_line = m*divergence_trace.times() + b
+#     trace_straight = divergence_trace.copy()
+#     trace_straight.data = straight_line
+#     df['straight_line'] = trace_straight.data
+
+    # print('divergence', df['divergence'].iloc[60000])
+    # print(df.straight_line.iloc[60000])
+
+    # need to find some way to fill the empty records
+
+
+    # find first null value in timestamp_orig 
+    # while True:
+    #     idx_null = df[(df['timestamp_orig'].iloc[0:].isna()].index.tolist()
+    #     if len(idx_null) > 0:
+    #         idx_null_start = idx_null[0]
+    #         print('start ', idx_null_start)
+    #         # now find the next not null
+    #         idx_null_idx_not_null = df['timestamp_orig'].iloc[idx_null_start:].first_valid_index()
+    #         print('end ', idx_not_null)
+    #         if idx_not_null is None:
+    #             idx_not_null
+
+
+
+    # idx_null = df[df['timestamp_orig'].isna()].index.tolist()
+    # if len(idx_null) > 0
+    # idx = idx_null[0]
+
+
+    # ZZZZ
+
+    df['last_valid_index'] = np.where((df['timestamp_orig'].isna()), pd.NA, df.index)
+
+    # applying ffill() method to fill the missing values
+    df['last_valid_index'].ffill(inplace=True)
+
+    df['last_valid_divergence'] = np.where((df['timestamp_orig'].isna()), pd.NA, df.divergence)
+    # applying ffill() method to fill the missing values
+    df['last_valid_divergence'].ffill(inplace=True)
+
+
+    df['last_valid_delta4'] = np.where((df['timestamp_orig'].isna()), pd.NA, df.delta4)
+    # applying ffill() method to fill the missing values
+    df['last_valid_delta4'].ffill(inplace=True)
+
+# segment_est_divergence1 = time_diff - (len(df)-1) * DELTA *4
+
+    
+
+    # estimate the divergence (for when there is no valid timestamp)
+    df['estimated_divergence'] = df['last_valid_divergence'] + ((df['last_valid_index'] - df.index) * (df.last_valid_delta4 - DELTA*4))
+    # logging.info(df.dtypes)
+
+
+    # idx_null = df[df['timestamp_orig'].isna()].index.tolist()
+    # print(len(idx_null))
+    # 
+    # idx_null = df[df['valid_index'].isna()].index.tolist()
+    # print(len(idx_null))    
+
+
+
+
+# make a funky little algorithm to find the start null, end null, previous delta, project the gradient, find next null after some good values, project the gradient again. !!!1
+            
+
+    
+    
+
+    # # if the value is empty, use the estimated divergence, otherwise use the real divergence
+    # df['divergence2'] = np.where(df.divergence.isna(), df.estimated_divergence, df.divergence)
+
+
+    # calculate the jumps (using the estimated divergence column - same as real divergence when it is not an estimate)
+    df['time_diff'] = df.estimated_divergence.diff(1)
+
+    df['correction'] = 0.0
+    df['possible_correction'] = pd.NA
+
+    # find the difference between the divergence and straight line 
+    # (the gradient when the start and ensd times are correct)
+    df['divergence_diff'] = df.straight_line - df.divergence 
+
+    idx_list =  df[((df['time_diff'].abs()) > 0.2)].index.tolist()
+    if len(idx_list) > 0:
+        df['timestamp'] = pd.to_datetime(df['timestamp_orig'], unit='s')
+        logging.info('WARNING: Jumps found:')
+        logging.info(df.iloc[idx_list].to_string())
+    
+
+    
+    # jumps are estimated on the time difference from the divergence trace
+
+
+    # first look for jumps - may be useful when we work out what else is going on 
+    # we are looking for jumps around 0.4 s and 0.8 s
+    df['jump'] = pd.NA
+
+    df['jump'] = np.where((df.time_diff > 0.3) & (df.time_diff < 0.5), 0.4, df['jump'])
+    df['jump'] = np.where((df.time_diff > 0.7) & (df.time_diff < 0.9), 0.8, df['jump'])
+    df['jump'] = np.where((df.time_diff > 1.1) & (df.time_diff < 1.3), 1.2, df['jump'])
+    df['jump'] = np.where((df.time_diff > 1.5) & (df.time_diff < 1.7), 1.6, df['jump'])
+    df['jump'] = np.where((df.time_diff > 1.9) & (df.time_diff < 2.1), 2.0, df['jump'])
+    
+    df['jump'] = np.where((df.time_diff < -0.3) & (df.time_diff > -0.5), -0.4, df['jump'])
+    df['jump'] = np.where((df.time_diff < -0.7) & (df.time_diff > -0.9), -0.8, df['jump'])
+    df['jump'] = np.where((df.time_diff < -1.1) & (df.time_diff > -1.5), -1.2, df['jump'])
+    df['jump'] = np.where((df.time_diff < -1.5) & (df.time_diff > -1.7), -1.6, df['jump'])
+    df['jump'] = np.where((df.time_diff < -1.9) & (df.time_diff > -2.1), -2.0, df['jump'])
+
+    idx_list =  df[(df['jump'].notna())].index.tolist()
+    for idx in idx_list:
+        jump = df.jump.iloc[idx]
+        orig_timestamp = df.timestamp_orig.iloc[idx]
+        # only the possible error, because sometimes the gradient is wrong
+        possible_correction = round(df.divergence_diff.iloc[idx],1)
+        if possible_correction in (-2.0,-1.6,-1.2,-0.8,-0.4,0.0,0.4,0.8,1.2,1.6,2.0):
+            df.at[idx,'possible_correction']= possible_correction
+        # logging.info('WARNING: corrected tapehead jump from original start timestamp {} to original end timestamp {} correction {:.01f} s [auto]'.format(start_timetamp,end_timestamp,correction))
+            logging.info('WARNING: corrected tapehead jump from original start timestamp {} difference {:.01f} s, possible error {:.01f} s [auto]'.format(UTCDateTime(orig_timestamp),jump,possible_correction))
+
+
+
+    # df['jump'] = np.where((df.time_diff > 0.3) | (df.time_diff < -0.3), df.time_diff, 0.0)
+
+    # if divergent_diff_found == False:    
+    #     df['correction'] = np.where((df.divergence_diff > 0.3) & (df.divergence_diff < 0.5), 0.4, df['correction'])
+    #     df['correction'] = np.where((df.divergence_diff > 0.7) & (df.divergence_diff < 0.9), 0.8, df['correction'])
+    #     df['correction'] = np.where((df.divergence_diff > 1.1) & (df.divergence_diff < 1.3), 1.2, df['correction'])
+    #     df['correction'] = np.where((df.divergence_diff > 1.5) & (df.divergence_diff < 1.7), 1.6, df['correction'])
+    #     df['correction'] = np.where((df.divergence_diff > 1.9) & (df.divergence_diff < 2.1), 2.0, df['correction'])
+    # 
+    #     df['correction'] = np.where((df.divergence_diff < -0.3) & (df.divergence_diff > -0.5), -0.4, df['correction'])
+    #     df['correction'] = np.where((df.divergence_diff < -0.7) & (df.divergence_diff > -0.9), -0.8, df['correction'])
+    #     df['correction'] = np.where((df.divergence_diff < -1.1) & (df.divergence_diff > -1.5), -1.2, df['correction'])
+    #     df['correction'] = np.where((df.divergence_diff < -1.5) & (df.divergence_diff > -1.7), -1.6, df['correction'])
+    #     df['correction'] = np.where((df.divergence_diff < -1.9) & (df.divergence_diff > -2.1), -2.0, df['correction'])
+
+    # potentially useless calculations: 
+
+
+    # df['correction'] = pd.NA
+    # df.at[0,'correction']= 0.0
+    
+
+    # 
+
+            #     divergence_diff = df.divergence_diff.iloc[idx]
+            #     if jump in (-2.0,-1.6,-1.2,-0.8,-0.4,0.0,0.4,0.8,1.2,1.6,2.0):
+            #     df.at[idx,'correction']= jump
+
+    # applying ffill() method to fill the missing values
+    df.possible_correction.ffill(inplace=True)
+
+    df['divergence_diff'] = df['divergence_diff'].round(1)
+    df['correction'] = np.where((df.possible_correction == df.divergence_diff), df['possible_correction'], 0.0)
+    
+    # 
+
+    
+
+    # idx = 64987
+    # logging.info(df.iloc[idx - 10: idx + 11].to_string())
+    # logging.info(df.dtypes)
+    correction_sum =  ((df['correction'].lt(0)) | (df['correction'].gt(0))).sum()
+    if correction_sum > 0:
+        logging.info('WARNING: {} timestamps corrected due to 400/800 ms tape head error'.format(correction_sum))
+
+    df['timestamp_corr'] = df.timestamp_orig - df['correction']
+
+    timestamp_corr = df[['timestamp_corr']].to_numpy(dtype='float64',na_value=None)
+    # abs_times = np.repeat(abs_times,4)
+    timestamp_corr = timestamp_corr.flatten()
+
+    orig_trace.data = timestamp_corr
+
+    # put the original mask back
+    orig_trace.data = np.ma.masked_array(orig_trace.data, mask)
+
+def estimate_timestamp(current_index, last_valid_index, last_valid_timestamp, last_valid_delta4):
+   return last_valid_timestamp + (current_index-last_valid_index) * last_valid_delta4
 
 # The old code kept the timing together until the end.
 # This is probably a good idea 
@@ -1045,12 +2020,16 @@ def timeshift_traces(stream):
 def first_record(index_no,sorted_df_list):
 
     df_list1 = sorted_df_list[index_no]
-    starttime0 = df_list1[0]
-    endtime = df_list1[1]
-    orig_station = df_list1[2]
+    starttime0 = df_list1['starttime']
+    endtime = df_list1['endtime']
+    orig_station = df_list1['orig_station']
     # orig_ground_station = df_list1[3]
-    corr_ground_station = df_list1[4]
-    df = df_list1[5]
+    corr_ground_station = df_list1['corr_ground_station']
+    df = df_list1['df']
+    attempt_merge = df_list1['attempt_merge']
+    segment_delta4 = df_list1['segment_delta4']
+    segment_est_divergence = df_list1['segment_est_divergence']
+    gzip_filename = df_list1['gzip_filename']
 
     # create a hash on the combined columns
     df['hash'] = pd.util.hash_pandas_object(df[[
@@ -1072,18 +2051,33 @@ def first_record(index_no,sorted_df_list):
         sample_time0 = starttime0
     else:
         logging.info('WARNING: Ground station: {} Station: {} Starttime not immediately after midnight {}'.format(corr_ground_station,orig_station,starttime0))
-        delta4 = df.delta4.iloc[0]
         
-        time_int = round((starttime0 - midnight)/delta4)
+        time_int = round((starttime0 - midnight)/segment_delta4)-1
+
+        est_start_time = starttime0 - time_int *segment_delta4
 
         # start the index at zero 
         df.time_index = np.arange(len(df))
         
-        sample_time0 = midnight + time_int *DELTA*4
+        sample_time0 = est_start_time + time_int *DELTA*4
 
-    logging.info('INFO: Zero index record. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={}'.format(index_no, orig_station, corr_ground_station, starttime0, sample_time0, starttime0-sample_time0))
+        # logging.info(sample_time0)
+        # logging.info(est_start_time)
+
+
+    
+
+    # projection = 24*3600 * (end_delta4_final-(DELTA*4))/DELTA*4
+
+    # loc = len(df_end_frames) - 1
+
+
+    logging.info('INFO: Zero index record. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={} Segment Divergence={:.02f} Reject={} File={}'.format(index_no, orig_station, corr_ground_station, starttime0, sample_time0, starttime0-sample_time0, segment_est_divergence,df_list1['reject'],gzip_filename))
+
+    calculate_last_valid(df,index_no)
 
     return starttime0, sample_time0
+
 
 def later_records(index_no,sample_time0, sorted_df_list):
 
@@ -1091,13 +2085,16 @@ def later_records(index_no,sample_time0, sorted_df_list):
     df_list1 = sorted_df_list[index_no]
     # starttime = df_list1[0]
     # endtime = df_list1[1]
-    orig_station = df_list1[2]
-    orig_ground_station = df_list1[3]
-    corr_ground_station = df_list1[4]
-    attempt_merge = df_list1[6]
+    orig_station = df_list1['orig_station']
+    orig_ground_station = df_list1['orig_ground_station']
+    corr_ground_station = df_list1['corr_ground_station']
+    attempt_merge = df_list1['attempt_merge']
+    reject = df_list1['reject'] 
+    segment_est_divergence = df_list1['segment_est_divergence']
+    gzip_filename = df_list1['gzip_filename']
 
     # find the current dataframe
-    df = df_list1[5]
+    df = df_list1['df']
     frame = df.frame.iloc[0]
 
     # create a hash on the combined columns (without the ground station)
@@ -1110,18 +2107,34 @@ def later_records(index_no,sample_time0, sorted_df_list):
         index=False)
 
     start_timestamp = df.corr_timestamp.iloc[0]
+    start_delta4 = df.delta4.iloc[0]
 
     # find the previous dataframe
     df_list_prev = sorted_df_list[index_no-1]
     # prev_starttime = df_list_prev[0]
     # prev_endtime = df_list_prev[1]
     
-    prev_df = df_list_prev[5]
-    # find the last record in the last timeseries
-    end_frame = prev_df.frame.iloc[-1]
-    end_timestamp = prev_df.corr_timestamp.iloc[-1]
-    
-    end_time_index = prev_df.time_index.iloc[-1]
+    prev_df = df_list_prev['df']
+
+    # is this a clock merge or a normal one?
+    clock_flag = df.clock_flag[0]
+
+    # if this contains the software clock, we need to use the last entry
+    # with the software clock - otherwise we will impose gaps 
+    # if not, we need to use the correct timestamps
+
+    # if there's a clock flag, use the clock flag record
+    if clock_flag == 1 and not (pd.isna(config.clock_end_time_index)):
+        end_frame = config.clock_end_frame
+        end_timestamp = config.clock_end_timestamp
+        end_time_index = config.clock_end_time_index
+        end_delta4 = config.clock_end_delta4 
+    else: 
+        # if not found, use the most recent valid record 
+        end_frame = config.valid_end_frame
+        end_timestamp = config.valid_end_timestamp
+        end_time_index = config.valid_end_time_index
+        end_delta4 = config.valid_end_delta4 
 
     timestamp_time_diff = (start_timestamp - end_timestamp).total_seconds()
     
@@ -1129,11 +2142,13 @@ def later_records(index_no,sample_time0, sorted_df_list):
 
     found_index = []
     method=''
-
     
     # logging.info('{} Original starttime (data time)={} 1st frame={} Original endtime={} Last frame={} ground_station={}'.format(index_no, starttime, frame, endtime, df.frame.iloc[-1],corr_ground_station))
 
     overlap_found = False
+    include_trace = False
+
+    # print('changed this temporarily - was 2 s')
     if start_timestamp <= (end_timestamp + pd.Timedelta(seconds=2)):
         start_timestamp_match = start_timestamp - pd.Timedelta(seconds=2)
         end_timestamp_match = start_timestamp + pd.Timedelta(seconds=2)
@@ -1168,10 +2183,13 @@ def later_records(index_no,sample_time0, sorted_df_list):
             prev_timestamp = prev_df.corr_timestamp.iloc[found_i]
 
             if prev_hash != current_hash:
-                logging.info('WARNING: Not a perfect match:')
-                # TODO  make a bit more of this 
-                logging.info(prev_df.iloc[found_i:found_i+1].to_string())
-                logging.info(df.iloc[0:1].to_string())
+                if reject == 'MAYBE':
+                    reject = 'YES'
+                else: 
+                    logging.info('WARNING: Not a perfect match:')
+                    # TODO  make a bit more of this 
+                    logging.info(prev_df.iloc[found_i:found_i+1].to_string())
+                    logging.info(df.iloc[0:1].to_string())
             # if abs(prev_timestamp - starttime) > 1:
             #     logging.info('WARNING: Time difference greater than 1 s.')        
             
@@ -1192,7 +2210,7 @@ def later_records(index_no,sample_time0, sorted_df_list):
             # # logging.info(tdiff={})
             # method='overlap'
             # logging.debug('method={} ground station time diff={} time_index={}'.format(method, t_diff, df.time_index.iloc[0]))
-            logging.info('INFO: Overlapping traces found. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={}'.format(index_no, orig_station, orig_ground_station, UTCDateTime(starttime), sample_time, UTCDateTime(starttime)-sample_time))
+            logging.info('INFO: Overlapping traces found. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={} Segment Divergence={:.02f} Reject={} File={}'.format(index_no, orig_station, orig_ground_station, UTCDateTime(starttime), sample_time, UTCDateTime(starttime)-sample_time,segment_est_divergence,df_list1['reject'],gzip_filename))
 
             # 
             # logging.info('prev')
@@ -1210,13 +2228,9 @@ def later_records(index_no,sample_time0, sorted_df_list):
     # if the item has not been found yet, try a different way 
     if len(found_index) == 0:
 
-        delta4_1 = prev_df.delta4.iloc[-1]
-        delta4_2 = df.delta4.iloc[0]
+        gradient = (start_delta4 + end_delta4)/2
 
-        gradient = (delta4_1 + delta4_2)/2
-        # XXXX
-
-        frame_gap_correct, actual_frame_gap, absolute_error, percent_error= loose_frame_diff(last_frame=end_frame,new_frame=frame,gap=timestamp_time_diff,delta4_1=delta4_1,delta4_2=delta4_2)
+        frame_gap_correct, actual_frame_gap, absolute_error, percent_error= loose_frame_diff(last_frame=end_frame,new_frame=frame,gap=timestamp_time_diff,delta4_1=end_delta4,delta4_2=start_delta4)
         if frame_gap_correct:
             index_diff = actual_frame_gap
         else: 
@@ -1229,18 +2243,159 @@ def later_records(index_no,sample_time0, sorted_df_list):
         sample_time = sample_time0 + df.iloc[0].time_index *DELTA*4
 
         if frame_gap_correct:
-            logging.info('INFO: Time gap with correct number of missing samples found. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={}'.format(index_no, orig_station, orig_ground_station, starttime, sample_time, starttime-sample_time ))
+            logging.info('INFO: Time gap with correct number of missing samples found. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={} Segment Divergence {:.02f} Reject={} File={}'.format(index_no, orig_station, orig_ground_station, starttime, sample_time, starttime-sample_time,segment_est_divergence,df_list1['reject'],gzip_filename))
         else: 
-            if overlap_found: 
-                logging.info('SEVERE: Overlap found and time gap does not agree with frame gap. Overwriting part of trace. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={}'.format(index_no, orig_station, orig_ground_station, starttime, sample_time, starttime-sample_time))
-                attempt_merge = False
-            else: 
-                logging.info('SEVERE: Time gap does not agree with frame gap. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={}'.format(index_no, orig_station, orig_ground_station, starttime, sample_time, starttime-sample_time))
+            if reject in ('MAYBE', 'YES'):
+                reject = 'YES'
+                logging.info('INFO: Frame Gap not correct. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={} Segment Divergence {:.02f} Reject={} File={}'.format(index_no, orig_station, orig_ground_station, starttime, sample_time, starttime-sample_time,segment_est_divergence, df_list1['reject'],gzip_filename))
+            else:
+                if overlap_found: 
+                    logging.info('SEVERE: Overlap found and time gap does not agree with frame gap. Overwriting part of trace. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={} Segment Divergence {:.02f} Reject={} File={}'.format(index_no, orig_station, orig_ground_station, starttime, sample_time, starttime-sample_time,segment_est_divergence,df_list1['reject'],gzip_filename))
+                    attempt_merge = False
+                else: 
+                    logging.info('SEVERE: Time gap does not agree with frame gap. Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={} Segment Divergence {:.02f} Reject={} File={}'.format(index_no, orig_station, orig_ground_station, starttime, sample_time, starttime-sample_time,segment_est_divergence,df_list1['reject'],gzip_filename))
 
     # TODO how do we sort later - should the timing be updated? 
-    df_list1[6] = attempt_merge
+    df_list1['attempt_merge'] = attempt_merge
+
+    if reject == 'YES':
+        config.rejected += 1
+        logging.info('INFO: Rejecting Trace index={} Station={} Ground Station={} Original Timestamp={} Sample Time={} Adjustment Time={} Segment Divergence {:.02f} Reject={} File={}'.format(index_no, orig_station, orig_ground_station, starttime, sample_time, starttime-sample_time,segment_est_divergence, df_list1['reject'], gzip_filename))
+        df.drop(df.index, inplace=True)
+        # logging.info(df.to_string())
+
+    calculate_last_valid(df,index_no)
 
 
+def calculate_segment_delta4(df):
+    
+    start_clock_flag = df.clock_flag.iloc[0]
+    end_clock_flag = df.clock_flag.iloc[-1]
+    
+    # get the details for the gradient for the segment
+    if start_clock_flag == 0 and end_clock_flag == 0:
+        start_timestamp = UTCDateTime(df.corr_timestamp.iloc[0])   
+        end_timestamp = UTCDateTime(df.corr_timestamp.iloc[-1])
+        time_diff = end_timestamp - start_timestamp
+        segment_delta4 = time_diff / (len(df)-1)
+
+        segment_est_divergence1 =  (len(df)-1) * DELTA *4 - time_diff
+        # now scale for 24 hours 
+        segment_est_divergence = segment_est_divergence1 * 86400 / time_diff
+    else:
+        segment_delta4 = pd.NA
+        segment_est_divergence = pd.NA
+
+    return segment_delta4, segment_est_divergence
+
+def calculate_last_valid(df,index_no):
+
+    if index_no == 0:
+            config.valid_end_frame = pd.NA
+            config.valid_end_timestamp = pd.NA
+            config.valid_end_time_index = pd.NA
+            config.valid_end_delta4 = pd.NA
+
+            config.clock_end_frame = pd.NA
+            config.clock_end_timestamp = pd.NA
+            config.clock_end_time_index = pd.NA
+            config.clock_end_delta4 = pd.NA        
+
+    if len(df) > 0: 
+        end_clock_flag = df.clock_flag.iloc[-1]
+        if end_clock_flag == 0:
+
+            config.valid_end_frame = df.frame.iloc[-1]
+            config.valid_end_timestamp = df.corr_timestamp.iloc[-1]
+            config.valid_end_time_index = df.time_index.iloc[-1]
+            config.valid_end_delta4 = df.delta4.iloc[-1]
+
+            config.clock_end_frame = pd.NA
+            config.clock_end_timestamp = pd.NA
+            config.clock_end_time_index = pd.NA
+            config.clock_end_delta4 = pd.NA
+
+        else: 
+
+            config.clock_end_frame = df.frame.iloc[-1]
+            config.clock_end_timestamp = df.corr_timestamp.iloc[-1]
+            config.clock_end_time_index = df.time_index.iloc[-1]
+            config.clock_end_delta4 = df.delta4.iloc[-1]
+
+    # last_timestamp = df.corr_timestamp.iloc[-1]
+    # last_time
+    # 
+    # 
+    # # find the last record in the last timeseries
+    # 
+    # 
+    # 
+    # end_clock_flag = df.clock_flag.iloc[-1]
+    # 
+    # start_timestamp = df.corr_timestamp.iloc[0]
+    # 
+    # start_clock_flag = df.clock_flag.iloc[0]
+    # 
+    # # if the clock flag was set, then also get the last good record, 
+    # # if there was one
+    # if end_clock_flag == 1:
+    #     # find the last record where the clock flag wasn't set 
+    #     idx_list = df[df.clock_flag == 0].index.tolist()
+    #     if len(idx_list) > 0:
+    #         last_good_clock_flag  = idx_list[-1]
+    #         # find the last record for the good clock flag
+    #         end_frame1 = df.frame.iloc[last_good_clock_flag]
+    #         end_timestamp1 = df.corr_timestamp.iloc[last_good_clock_flag]
+    #         end_time_index1 = df.time_index.iloc[last_good_clock_flag]
+    #         end_clock_flag1 = df.clock_flag.iloc[last_good_clock_flag]
+    #         end_delta4_1 = df.delta4.iloc[last_good_clock_flag]
+    #         df_end_frames1 = {'end_frame' : end_frame1, 'end_timestamp' :end_timestamp1, 'end_time_index' : end_time_index1, 'end_clock_flag' : end_clock_flag1, 'end_delta4' : end_delta4_1}
+    #         df_end_frames = df_end_frames.append(df_end_frames1,ignore_index = True)
+    # 
+    # 
+    # df_end_frames2 = {'end_frame' : end_frame, 'end_timestamp' :end_timestamp, 'end_time_index' : end_time_index, 'end_clock_flag' : end_clock_flag, 'end_delta4' : end_delta4,  'start_timestamp' : start_timestamp}
+    # df_end_frames = df_end_frames.append(df_end_frames2,ignore_index = True)
+    # 
+    # return df_end_frames
+
+# def calculate_end_frames(df,df_end_frames=None):
+# 
+#     # Start!!
+#     if df_end_frames is None:
+#         # make a dataframe to store the last records 
+#         df_end_frames = pd.DataFrame(data=None, columns=['end_frame','end_timestamp','end_time_index','end_clock_flag'])
+# 
+#     # find the last record in the last timeseries
+#     end_frame = df.frame.iloc[-1]
+#     end_timestamp = df.corr_timestamp.iloc[-1]
+#     end_time_index = df.time_index.iloc[-1]
+#     end_clock_flag = df.clock_flag.iloc[-1]
+#     end_delta4 = df.delta4.iloc[-1]
+#     start_timestamp = df.corr_timestamp.iloc[0]
+# 
+#     start_clock_flag = df.clock_flag.iloc[0]
+# 
+#     # if the clock flag was set, then also get the last good record, 
+#     # if there was one
+#     if end_clock_flag == 1:
+#         # find the last record where the clock flag wasn't set 
+#         idx_list = df[df.clock_flag == 0].index.tolist()
+#         if len(idx_list) > 0:
+#             last_good_clock_flag  = idx_list[-1]
+#             # find the last record for the good clock flag
+#             end_frame1 = df.frame.iloc[last_good_clock_flag]
+#             end_timestamp1 = df.corr_timestamp.iloc[last_good_clock_flag]
+#             end_time_index1 = df.time_index.iloc[last_good_clock_flag]
+#             end_clock_flag1 = df.clock_flag.iloc[last_good_clock_flag]
+#             end_delta4_1 = df.delta4.iloc[last_good_clock_flag]
+#             df_end_frames1 = {'end_frame' : end_frame1, 'end_timestamp' :end_timestamp1, 'end_time_index' : end_time_index1, 'end_clock_flag' : end_clock_flag1, 'end_delta4' : end_delta4_1}
+#             df_end_frames = df_end_frames.append(df_end_frames1,ignore_index = True)
+# 
+# 
+#     df_end_frames2 = {'end_frame' : end_frame, 'end_timestamp' :end_timestamp, 'end_time_index' : end_time_index, 'end_clock_flag' : end_clock_flag, 'end_delta4' : end_delta4,  'start_timestamp' : start_timestamp}
+#     df_end_frames = df_end_frames.append(df_end_frames2,ignore_index = True)
+# 
+#     return df_end_frames
 
 
 def find_dir(top_level_dir,station,starttime,lower=True):
@@ -1354,6 +2509,7 @@ def save_stream(stream,join_dir):
 
     for station in ['S11','S12','S14','S15','S16']:
         station_stream = stream.select(station=station)
+
         if len(station_stream) > 0:
             locations = set()
             for tr in station_stream:
@@ -1370,14 +2526,24 @@ def save_stream(stream,join_dir):
 
                 for channel in ('AFR', 'ATT', 'MH1', 'MH2', 'MHZ', 'SHZ',):
                     # note that 'AFR only exists if 'config.combine_ground_stations == False
-                    channel_stream = location_stream.select(channel=channel)
+                    channel_stream = location_stream.select(channel=channel)   
+                    if station == 'S14' and channel == 'MHZ' and starttime > UTCDateTime('1972-03-12T00:00') and starttime < UTCDateTime('1976-11-17T00:00:00.000000Z'):
+                        # we are not saving the MHZ track during this time frame. 
+                        continue
+
+
                     if len(channel_stream) > 0:
-                        filename = filename_from_trace(channel_stream[0],directory)
+                        filename = filename_from_trace(channel_stream[0],directory,lower=False)
                         filename = os.path.join(directory,filename)
 
+                        if channel == 'ATT':
+                            # mask the ATT trace which has gaps with a fill value
+                            trace = channel_stream[0]
+                            trace.data = trace.data.filled(fill_value=-1.0)
+                        
                         # logging.info('Temporarily not writing {}'.format(filename))
                         # split the streams in order to save them
-                        channel_stream = channel_stream.split()
+                        # channel_stream = channel_stream.split()
                         
                         # if 'xa.s16..mh1.1976.064.1.0.mseed'  in filename:
                         #     # channel_stream.plot(method='full',size=(1200,600))
@@ -1407,7 +2573,7 @@ def loose_frame_diff(last_frame,new_frame,gap,delta4_1=None,delta4_2=None):
         else:
             delta4 = DELTA*4
 
-    logging.debug('loose_frame_diff {} {} {}'.format(last_frame,new_frame,gap))
+
     # tolerance (plus or minus) in seconds
     TOLERANCE = 1
 
@@ -1495,8 +2661,15 @@ def loose_frame_diff(last_frame,new_frame,gap,delta4_1=None,delta4_2=None):
         else:
             percent_error = 0
 
-        max_estimate = gap + (gap*MAX_PERCENT_ERROR/100) + TOLERANCE
-        min_estimate = gap - (gap*MAX_PERCENT_ERROR/100) - TOLERANCE
+        range = (gap*MAX_PERCENT_ERROR/100) + TOLERANCE
+        # if range is greater than 20 s, we can't make the estimate 
+        if range > 20:
+            range = 20
+
+        max_estimate = gap + range
+        min_estimate = gap - range
+
+        logging.debug('gap {} max estimate {}, min estimate {}'.format(gap, min_estimate,max_estimate))
         
         # check if it is within tolerance 
         if (est_gap < max_estimate) and (est_gap > min_estimate):
@@ -1510,6 +2683,8 @@ def loose_frame_diff(last_frame,new_frame,gap,delta4_1=None,delta4_2=None):
             frame_gap_correct = True
 
         # logging.info('{} {}'.format(max_estimate, min_estimate))
+
+    logging.debug('loose_frame_diff {} {} {} absolute error {} percent error{} frame_gap_correct {}'.format(last_frame,new_frame,gap, absolute_error, percent_error, frame_gap_correct))
 
     return frame_gap_correct, actual_frame_gap, absolute_error, percent_error
 
@@ -1556,7 +2731,6 @@ def initial_cleanup(df):
         df['shz_4'] = to_Int64(df['shz_4'])
         df['shz_6'] = to_Int64(df['shz_6'])
         df['shz_8'] = to_Int64(df['shz_8'])
-        # XXXX
         df['shz_10'] = to_Int64(df['shz_10'])
         df['shz_12'] = to_Int64(df['shz_12'])
         df['shz_14'] = to_Int64(df['shz_14'])
@@ -1633,6 +2807,7 @@ def initial_cleanup(df):
     
 
 
+
     df['frame'] = to_Int64(df['frame'])
 
     # replace empty ground station and orig station with values
@@ -1646,6 +2821,37 @@ def initial_cleanup(df):
     df['corr_gap_count'] = to_Int64(df['corr_gap_count'])
     df['time_index'] = 0
     df['delta4'] = df['delta4'].astype(float)
+
+    # print('v temp test for not displaying when there are gaps')
+    # df.at[1000:2000,'orig_no'] = pd.NA
+
+
+    # logging.info(df.head().to_string())
+    # logging.info(df.tail().to_string())
+
+    # XXXX
+
+    # check for any nulls at the beginning and remove    
+    if pd.isna(df['orig_no'].iloc[0]) or pd.isna(df['orig_no'].iloc[1]):
+        idx_list_nonull =  df[(df['orig_no'].notna())].index.tolist()
+        if pd.isna(df['orig_no'].iloc[0]) == True:
+            first_good_idx = idx_list_nonull[0]
+        else: 
+            first_good_idx = idx_list_nonull[1]
+        df.drop(df.index[0:first_good_idx], inplace=True)
+        df.reset_index(inplace=True,drop=True)
+    
+    # check for any nulls at the end and remove
+    if pd.isna(df['orig_no'].iloc[-1]) or pd.isna(df['orig_no'].iloc[-2]):
+        idx_list_nonull =  df[(df['orig_no'].notna())].index.tolist()
+        if pd.isna(df['orig_no'].iloc[-1]):
+            last_good_idx = idx_list_nonull[-1]
+        else:
+            last_good_idx = idx_list_nonull[-2]
+        df.drop(df.index[last_good_idx+1:len(df)], inplace=True)
+    
+    # logging.info(df.head().to_string())
+    # logging.info(df.tail().to_string())
 
     return df
 
@@ -1900,6 +3106,27 @@ def stream_import(df,sample_time0,index0,attempt_merge):
     # abs_times = np.repeat(abs_times,4)
     abs_times = abs_times.flatten()
 
+    # make a mask for corr_timestamp 
+    mask = df[['orig_no']].to_numpy(dtype='int32',na_value=INVALID)
+    mask = mask.flatten()
+    # print(mask[0:5])
+    mask = ma.masked_equal(mask, INVALID)
+    mask = ma.getmask(mask)
+    # print(mask[0:5])
+
+    # print(abs_times[0:5])
+
+    # XXXX
+    if config.exclude_masked_sections:
+        # mask the trace during data gaps 
+        abs_times = ma.masked_array(abs_times, mask=mask)
+
+
+    delta4 = df[['delta4']].to_numpy(dtype='float64',na_value=None)
+    # abs_times = np.repeat(abs_times,4)
+    delta4 = delta4.flatten()
+
+
     ground_station = str(df['corr_ground_station'].iloc[0])
     
     station = df['orig_station'].iloc[0]
@@ -1912,6 +3139,10 @@ def stream_import(df,sample_time0,index0,attempt_merge):
     # logging.info('clock starttime={} Adjusting time {}s'.format(UTCDateTime(abs_times[0]),adjustment_time))
 
     # TODO - check that we don't mess up the time differences here!!!!
+
+    clock_flag = df[['clock_flag']].to_numpy(dtype='int32',na_value=INVALID)
+    clock_flag = clock_flag.flatten()
+
 
     tr_MH1 = Trace(data=mh1)
     tr_MH1.stats.delta = DELTA
@@ -1952,11 +3183,31 @@ def stream_import(df,sample_time0,index0,attempt_merge):
     tr_ATT.stats.starttime = sample_time
     tr_ATT.stats.location = ''
 
+    tr_CLK = Trace(data=clock_flag)
+    tr_CLK.stats.delta = DELTA*4
+    tr_CLK.stats.network = NETWORK
+    tr_CLK.stats.station = station
+    tr_CLK.stats.ground_station = ground_station
+    tr_CLK.stats.channel = 'CLK'
+    tr_CLK.stats.starttime = sample_time
+    tr_CLK.stats.location = ''
+
+    tr_DL4 = Trace(data=delta4)
+    tr_DL4.stats.delta = DELTA*4
+    tr_DL4.stats.network = NETWORK
+    tr_DL4.stats.station = station
+    tr_DL4.stats.ground_station = ground_station
+    tr_DL4.stats.channel = 'DL4'
+    tr_DL4.stats.starttime = sample_time
+    tr_DL4.stats.location = ''
+
     # append the trace
     stream.append(tr_MH1)
     stream.append(tr_MH2)
     stream.append(tr_MHZ)
     stream.append(tr_ATT)
+    stream.append(tr_CLK)
+    stream.append(tr_DL4)
 
     if config.combine_ground_stations == False: 
         tr_AFR = Trace(data=frame)
