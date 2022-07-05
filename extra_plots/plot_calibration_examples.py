@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from obspy.core.utcdatetime import UTCDateTime
 from matplotlib import gridspec
-from pdart.view import stream_from_directory
+from pdart.view import stream_from_directory_new
 
     # start_time = UTCDateTime('1971-02-07T00:45:00')
 
@@ -23,8 +23,8 @@ def calibration_example():
     channels = ['MH1', 'MH2', 'MHZ']
     end_time = start_time + timedelta(minutes=4.5)
 
-    stream = stream_from_directory(
-      top_level_dir='/Users/nunn/lunar_data/PDART',
+    stream = stream_from_directory_new(
+      top_level_dir='/Users/cnunn/lunar_data/PDART_CORRECTED',
       start_time=start_time,
       stations=stations,
       channels=channels,
@@ -37,8 +37,8 @@ def calibration_example():
     channels = ['MH1', 'MH2', 'MHZ']
     end_time = start_time + timedelta(minutes=9)
 
-    stream2 = stream_from_directory(
-      top_level_dir='/Users/nunn/lunar_data/PDART',
+    stream2 = stream_from_directory_new(
+      top_level_dir='/Users/cnunn/lunar_data/PDART_CORRECTED',
       start_time=start_time,
       stations=stations,
       channels=channels,
