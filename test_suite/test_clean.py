@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# Tests cleaning the data and also includes spike_cleaning.png
 
 """
 Test Suite 
@@ -38,30 +39,17 @@ from obspy.core import Stream, read
 # Qt5Agg seems to work best on Mac - try 'TkAgg' if that works for you
 # put this after the other imports, otherwise it can be overridden
 import matplotlib  
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
-# from pdart.csv_check_work_tapes import (
-#   all_drop_duplicates,
-#   all_split, 
-#     # station_fix_timestamps, 
-#   station_fix_missing_timestamps, 
-#   initial_cleanup, detailed_report,
-#   station_remove_damaged_timestamps,calculate_gaps,
-#   station_fix_frames,
-#   # station_fix_timeskips, 
-#   # add_frame, 
-#   minus_frame, frame_diff,
-#   station_consec_frames,station_simple_fix_timestamp,
-#   get_new_ground_station,all_drop_station_duplicates,all_station_duplicates_v2,
-#   all_flat_seismogram, to_Int64
-# )
 import pdart.config as config
+import pdart.csv_join_work_tapes as csv_join_work_tapes
 from pdart.test_suite.test_import import basic_timeseries_station as basic_timeseries_station
 from pdart.test_suite.test_import import default_config as default_config
 from pdart.csv_join_work_tapes import stream_import, initial_cleanup, merge_channel_stream, despike3, loose_frame_diff, read_file, process_list
 from pdart.csv_check_work_tapes import calculate_gaps, to_Int64, add_or_minus_frame
 from pdart.extra_plots.plot_timing_divergence import plot_timing
 from pdart.snippet import relative_timing_trace
+import numpy.ma as ma
 
 # consecutive stations (the order is important)
 STATIONS = ['S12', 'S15', 'S16', 'S14', 'S17']
@@ -79,15 +67,7 @@ DATEFORMAT='%Y-%m-%dT%H:%M:%S.%fZ'
 
 GZIP_FILENAME='test.csv.gz'
 
-# from obspy import Stream, Trace, UTCDateTime, read, read_inventory
-# from obspy.core.inventory import Channel, Inventory, Network, Station
-# from obspy.core.compatibility import mock
-# from obspy.core.stream import _is_pickle, _read_pickle, _write_pickle
-# from obspy.core.util.attribdict import AttribDict
-# from obspy.core.util.base import NamedTemporaryFile, _get_entry_points
-# from obspy.core.util.obspy_types import ObsPyException
-# from obspy.core.util.testing import streams_almost_equal
-# from obspy.io.xseed import Parser
+INVALID = csv_join_work_tapes.INVALID
 
 '''
 A testcase is created by subclassing unittest.TestCase. The three individual 
@@ -158,7 +138,7 @@ def overlapping_timeseries():
     ##############################
     df_gst = basic_timeseries_station()  
     starttime0 = df_gst.corr_timestamp.iloc[0]
-    starttime0 = pd.Timestamp(starttime0) 
+    starttime0 = UTCDateTime(starttime0) 
     df_gst['time_index'] = np.arange(len(df_gst))
     df_gst2 = df_gst.copy(deep=True)
 
@@ -172,24 +152,27 @@ def overlapping_timeseries():
     df_gst2.orig_timestamp = df_gst2.orig_timestamp + pd.Timedelta(seconds=0.802)
     df_gst2.corr_ground_station = 7
 
-    stream1 = stream_import(df_gst,starttime0=starttime0,index0=0) 
-    stream2 = stream_import(df_gst2,starttime0=starttime0,index0=0) 
+    stream1 = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False) 
+    stream2 = stream_import(df_gst2,sample_time0=starttime0,index0=0,attempt_merge=False) 
+
+
 
     return(stream1, stream2, starttime0)
 
 def basic_timeseries_stream():
     df_gst = basic_timeseries_station()
     starttime0 = df_gst.corr_timestamp.iloc[0]
-    starttime0 = pd.Timestamp(starttime0)  
+    starttime0 = UTCDateTime(starttime0)
+ 
     df_gst['time_index'] = np.arange(len(df_gst)) 
-    stream = stream_import(df_gst,starttime0=starttime0,index0=0) 
+    stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False) 
     return stream
 
 def overlapping_timeseries_five():
     ##############################
     df_gst = basic_timeseries_station()  
     starttime0 = df_gst.corr_timestamp.iloc[0]
-    starttime0 = pd.Timestamp(starttime0) 
+    starttime0 = UTCDateTime(starttime0) 
     df_gst['time_index'] = np.arange(len(df_gst))
     df_gst2 = df_gst.copy(deep=True)
     df_gst3 = df_gst.copy(deep=True)
@@ -235,11 +218,11 @@ def overlapping_timeseries_five():
     df_gst5.corr_ground_station = 5
     
 
-    stream1 = stream_import(df_gst,starttime0=starttime0,index0=0) 
-    stream2 = stream_import(df_gst2,starttime0=starttime0,index0=0) 
-    stream3 = stream_import(df_gst3,starttime0=starttime0,index0=0) 
-    stream4 = stream_import(df_gst4,starttime0=starttime0,index0=0) 
-    stream5 = stream_import(df_gst5,starttime0=starttime0,index0=0) 
+    stream1 = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False) 
+    stream2 = stream_import(df_gst2,sample_time0=starttime0,index0=0,attempt_merge=False) 
+    stream3 = stream_import(df_gst3,sample_time0=starttime0,index0=0,attempt_merge=False) 
+    stream4 = stream_import(df_gst4,sample_time0=starttime0,index0=0,attempt_merge=False) 
+    stream5 = stream_import(df_gst5,sample_time0=starttime0,index0=0,attempt_merge=False) 
 
     return stream1, stream2,stream3, stream4, stream5, starttime0
 
@@ -401,9 +384,11 @@ class ImportTestCase(unittest.TestCase):
         # test the spike types - large
         ##############################
         # Complicated spike with a base above the mean  
-        stream = basic_timeseries_stream()   
+        stream = basic_timeseries_stream() 
+
+        print(stream)
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         
         # set a mean
@@ -426,13 +411,16 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        # if INVALID in channel_stream1[0].data:
+        #     channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
+
         
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[90]))
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[170]))
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         
         # set a mean
@@ -455,8 +443,10 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        # if INVALID in channel_stream1[0].data:
+        #     channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
-        
+    
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[90]))
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[170]))
         
@@ -466,7 +456,7 @@ class ImportTestCase(unittest.TestCase):
         stream = basic_timeseries_stream()
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         
         # set a mean
@@ -489,8 +479,10 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
-        
+
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[90]))
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[170]))
         
@@ -500,7 +492,7 @@ class ImportTestCase(unittest.TestCase):
         stream = basic_timeseries_stream()
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         
         # set a mean
@@ -523,7 +515,10 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
+
         
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[90]))
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[170]))
@@ -533,7 +528,7 @@ class ImportTestCase(unittest.TestCase):
         stream = basic_timeseries_stream()
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         # set a mean   
         for i in range(0,len(channel_stream1[0].data)):
@@ -555,18 +550,23 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
+
         
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[141]))        
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[142]))
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[143]))
+
+
         
         ##############################
         # Test removing spike after a masked value
         stream = basic_timeseries_stream()
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         # set a mean   
         for i in range(0,len(channel_stream1[0].data)):
@@ -588,13 +588,16 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
-
         print('after null end')
         
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[141]))
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[142]))
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[143]))
+
+
         
         ##############################
         # Spike on last record of the trace
@@ -619,16 +622,19 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
         
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[-1]))
+
         
         ##############################
         # Spike on first record of the trace
         stream = basic_timeseries_stream()
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         # set a mean   
         for i in range(0,len(channel_stream1[0].data)):
@@ -646,17 +652,19 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
-        
+
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[0]))
         
-        
+
         ##############################
         # Test removing spike 2 after masked value 
         stream = basic_timeseries_stream()
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         # set a mean   
         for i in range(0,len(channel_stream1[0].data)):
@@ -679,18 +687,21 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
         
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[140]))
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[141]))
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[142]))
+
         
         ##############################
         # Test removing spike 2 before masked value 
         stream = basic_timeseries_stream()
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         # set a mean   
         for i in range(0,len(channel_stream1[0].data)):
@@ -716,21 +727,22 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
         # channel_stream1.plot(method='full',size=(1200,600))
         
         
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[142]))
         self.assertTrue(~np.ma.is_masked(channel_stream1[0].data[143]))
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[144]))
-        
-        
+
         
         ##############################
         # Test removing spike after a masked value
         stream = basic_timeseries_stream()
         
         # add an error to the MH1 channel on stream1
-        channel_stream1 = stream.select(channel='MH1')
+        channel_stream1 = stream.select(channel='MH1').copy()
         
         # set a mean   
         for i in range(0,len(channel_stream1[0].data)):
@@ -754,7 +766,9 @@ class ImportTestCase(unittest.TestCase):
             rec_spikes_found = despike3(tr)
         
         channel_stream1 += channel_stream2
-        # channel_stream1.plot(method='full',size=(1200,600))
+        if INVALID in channel_stream1[0].data:
+            channel_stream1[0].data = ma.masked_where(channel_stream1[0].data == INVALID, channel_stream1[0].data)
+        channel_stream1.plot(method='full',size=(1200,600))
         
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[140]))
         self.assertTrue(np.ma.is_masked(channel_stream1[0].data[142]))
@@ -1296,7 +1310,7 @@ class ImportTestCase(unittest.TestCase):
 
         df_gst = basic_timeseries_station()  
         starttime0 = df_gst.corr_timestamp.iloc[0]
-        starttime0 = pd.Timestamp(starttime0)
+        starttime0 = UTCDateTime(starttime0)
 
         ##############################
         # first view a combined import (test stream_import, and check that 
@@ -1304,7 +1318,7 @@ class ImportTestCase(unittest.TestCase):
         df_gst = basic_timeseries_station()  
         df_gst['time_index'] = np.arange(len(df_gst))
         
-        stream = stream_import(df_gst,starttime0=starttime0,index0=0)
+        stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False)
         for tr in stream:
             tr.stats.location = ''
         # stream.plot(method='full',size=(1200,600))
@@ -1326,7 +1340,7 @@ class ImportTestCase(unittest.TestCase):
 
         df_gst = basic_timeseries_station()  
         starttime0 = df_gst.corr_timestamp.iloc[0]
-        starttime0 = pd.Timestamp(starttime0)  
+        starttime0 = UTCDateTime(starttime0)  
         
         ##############################
         # Test the merge code (note that this isn't a method, 
@@ -1388,7 +1402,7 @@ class ImportTestCase(unittest.TestCase):
         df_gst = basic_timeseries_station()  
         df_gst['time_index'] = np.arange(len(df_gst))
         
-        basic_stream = stream_import(df_gst,starttime0=starttime0,index0=0)
+        basic_stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False)
         for tr in basic_stream:
             tr.stats.location = ''
         
@@ -1513,14 +1527,14 @@ class ImportTestCase(unittest.TestCase):
 
         df_gst = basic_timeseries_station()  
         starttime0 = df_gst.corr_timestamp.iloc[0]
-        starttime0 = pd.Timestamp(starttime0)
+        starttime0 = UTCDateTime(starttime0)
 
         ##############################
         # first view a basic import
         df_gst = basic_timeseries_station()  
         df_gst['time_index'] = np.arange(len(df_gst))
         
-        stream = stream_import(df_gst,starttime0=starttime0,index0=0)
+        stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False)
         
         stream.plot(method='full',size=(1200,600))
 
@@ -1536,7 +1550,7 @@ class ImportTestCase(unittest.TestCase):
             spikes += 1
         
         config.clean_spikes = False
-        stream = stream_import(df_gst,starttime0=starttime0,index0=0)
+        stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False)
         
         for tr in stream:
             if tr.stats.channel == 'MH2' and tr.stats.station == 'S12':
@@ -1556,7 +1570,7 @@ class ImportTestCase(unittest.TestCase):
             spikes += 1
         
         config.clean_spikes = True
-        stream = stream_import(df_gst,starttime0=starttime0,index0=0)
+        stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False)
         
         for tr in stream:
             if tr.stats.channel == 'MH2' and tr.stats.station == 'S12':
@@ -1577,7 +1591,7 @@ class ImportTestCase(unittest.TestCase):
             spikes += 1
         
         config.clean_spikes = True
-        stream = stream_import(df_gst,starttime0=starttime0,index0=0)
+        stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False)
         
         for tr in stream:
             if tr.stats.channel == 'MH2' and tr.stats.station == 'S12':
@@ -1612,7 +1626,7 @@ class ImportTestCase(unittest.TestCase):
         df_gst['time_index'] = np.arange(len(df_gst))
         
         config.clean_spikes = True
-        stream = stream_import(df_gst,starttime0=starttime0,index0=0)
+        stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False)
         # stream.plot(method='full',size=(1200,600))
         
         for tr in stream:
@@ -1628,19 +1642,13 @@ def plot_spikes_removal():
     # add a single downward spike to an array with a few gaps
     df_gst = basic_timeseries_station()  
     starttime0 = df_gst.corr_timestamp.iloc[0]
-    starttime0 = pd.Timestamp(starttime0) 
+    starttime0 = UTCDateTime(starttime0) 
     
     # add a spike 
     spikes = 0
     for row_i in range(25,26):
         df_gst.at[row_i,'orig_mh1_1'] = 100
         spikes += 1
-    
-    # delete some records 
-    # to_drop = [28, 31, 32]
-    # df_gst.drop(to_drop,inplace=True)
-    
-    # df_gst.reset_index(inplace=True,drop=True)
     
     df_gst, gaps_long, gaps_8888 = calculate_gaps(df_gst)  
     
@@ -1653,7 +1661,7 @@ def plot_spikes_removal():
     df_gst['time_index'] = np.arange(len(df_gst))
     
 
-    stream = stream_import(df_gst,starttime0=starttime0,index0=0)
+    stream = stream_import(df_gst,sample_time0=starttime0,index0=0,attempt_merge=False)
     stream_before = stream.select(channel='MH1')
     # replace with a sine wave 
     for tr in stream_before:
@@ -1724,12 +1732,12 @@ def suite():
     # suite.addTest(unittest.makeSuite(ImportTestCase, 'test'))
 
     # add tests individually 
-    # suite.addTest(unittest.makeSuite(ImportTestCase, 'test_combine1'))
-    # suite.addTest(unittest.makeSuite(ImportTestCase, 'test_despike3'))
-    # suite.addTest(unittest.makeSuite(ImportTestCase, 'test_merge'))
-    # suite.addTest(unittest.makeSuite(ImportTestCase, 'test_combined_import'))
-    # suite.addTest(unittest.makeSuite(ImportTestCase, 'test_combined_merge'))
-    # suite.addTest(unittest.makeSuite(ImportTestCase, 'test_spike'))
+    suite.addTest(unittest.makeSuite(ImportTestCase, 'test_combine1'))
+    suite.addTest(unittest.makeSuite(ImportTestCase, 'test_despike3'))
+    suite.addTest(unittest.makeSuite(ImportTestCase, 'test_merge'))
+    suite.addTest(unittest.makeSuite(ImportTestCase, 'test_combined_import'))
+    suite.addTest(unittest.makeSuite(ImportTestCase, 'test_combined_merge'))
+    suite.addTest(unittest.makeSuite(ImportTestCase, 'test_spike'))
     suite.addTest(unittest.makeSuite(ImportTestCase, 'test_joins'))
 
 
@@ -1738,10 +1746,6 @@ def suite():
 
 
 if __name__ == '__main__':
-
-    st = read('/Users/cnunn/lunar_data/PDART_CONTINUOUS_MAIN_TAPES/s14/1973/181/xa.s14..shz.1973.181.0.mseed')
-    print(st)
-    exit()
 
     # plot_spikes_removal()
     unittest.main(defaultTest='suite')
