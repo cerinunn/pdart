@@ -4,6 +4,8 @@
 
 """
 Test Suite 
+Old file for testing the imports. 
+
 :copyright:
     The pdart Development Team & Ceri Nunn
 :license:
@@ -37,9 +39,7 @@ from pdart.csv_check_work_tapes import (
   initial_cleanup, detailed_report,
   calculate_gaps,
   station_fix_frames,
-  # station_fix_timeskips, 
   add_or_minus_frame, minus_frame, frame_diff,
-  # station_consec_frames,
   station_simple_fix_timestamp,
   get_new_ground_station,all_drop_station_duplicates,all_station_duplicates_v2,
   all_flat_seismogram, check_compliance, calculate_delta4,
@@ -91,9 +91,11 @@ be executed before and after each test method.
 def basic_timeseries_station(no_records=6):
     df = basic_timeseries(no_records=no_records)
 
-
     # make a timeseries with only 'S12' data in it 
     df = initial_cleanup(df)
+
+    df['delta4'] = 0.604    
+
     # detailed_report(df,'')
     grouped_st = df.groupby('orig_station')
     df_st = grouped_st.get_group('S12')
@@ -102,9 +104,12 @@ def basic_timeseries_station(no_records=6):
     # # make a new index
     df_st.reset_index(inplace=True,drop=True)
 
+
+
     return df_st
 
 def basic_timeseries(no_records=3):
+
     random.seed(a=2)
     # orig_no,orig_timestamp,orig_frame,orig_station,clock_flag,orig_ground_station,orig_mh1_1,orig_mh2_1,orig_mhz_1,orig_mh1_2,orig_mh2_2,orig_mhz_2,orig_mh1_3,orig_mh2_3,orig_mhz_3,orig_mh1_4,orig_mh2_4,orig_mhz_4
     # 1,1976-03-01T00:01:44.696000Z,1,S12,0,9,531,491,481,531,491,481,531,491,481,531,491,481
@@ -166,6 +171,8 @@ def basic_timeseries(no_records=3):
     df['orig_ground_station'] = 9
     df['bit_synchronizer'] = '00011'
     df['sync'] = '1110001001000011101101'
+
+
     frame = [3,10,13,20,23]
 
     for i in range(60*no_records-5):
