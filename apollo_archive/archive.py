@@ -4,7 +4,84 @@
 '''
 Build the Apollo data archive for the PDS
 
+    # Workflow
+    # For test purposes, run ./examples/run_csv_join_archive_test.py to set up PDART_ARCHIVE_TEST
+    # to get a subset of the final MSEED files 
+
+
+    # copy the metadata file
+    # cp /Users/cnunn/lunar_data/PDART_METADATA/XA.1969-1977.0.xml /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/data/xa/metadata/stationxml.xa.0.sxml
+
+    # make the dataless file 
+    # cd /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/data/xa/metadata
+    # java -jar /Users/cnunn/Applications/stationxml-seed-converter-2.1.0.jar --input stationxml.xa.0.sxml --output dataless.xa.0.seed
+
+
+
+    # make sure the release number is correct 
+    # run each section of archive()
+
+    cd  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/
+
+    cat  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory_stationxml.csv.tmp  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.tmp > collection_data_table_inventory.csv
+
+    cat  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory_dataless.csv.tmp  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory.csv.tmp > collection_data_seed_inventory.csv
+
+    check numbers for collection xml files 
+
+    /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/data
+
+    find . -name "*.mseed" | wc
+    find . -name "*.xml" ! -name "*a.xml" ! -name "dataless*" ! -name "station*" ! -name "collection*" ! -name "seis_release_note*" | wc
+    find . -name "*.csv" ! -name "*collection*" | wc
+    find . -name "*a.xml" | wc
+
+
+    find . -name "*.mseed" -empty
+    find . -name "*.xml" ! -name "*a.xml" -empty
+    find . -name "*.csv" -empty 
+    find . -name "*a.xml" -empty
+
+    Manually edit the  collection_data_seed.xml and collection_data_table.xml files, 
+    including the number of records,  stop_date_time, version_id, modification_detail
+    make sure the line endings are ok (change with Atom) 
+
+    get the number of records with:
+    wc collection_data_seed_inventory.csv
+    wc collection_data_table_inventory.csv
+    wc  collection_data_lander_inventory.csv
+
+
+    cd  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/
+    md5deep -r * > md5output.txt
+
+    cd  /Users/cnunn/lunar_data/ARCHIVE
+    zip -r  pdart_pds_output_18_jul  pdart_pds_output
+
+
+
+
+    Also, I ran this code once:
+    # make a stationxml file which contains ATT 
+    # make_att_metadata(input_metadata,updated_metadata)
+    # print('make metadata file (for geocsv processing), using latest file')
+    # make_metadata(updated_metadata,metadata_file)
+
+
+    # I also experimentated with making a geocsv file with more information, but did't use it in the end.
+    # This requires making a metadata. 
+
+    # make_metadata(input_metadata,metadata_file)
+    # input_metadata = '/Users/cnunn/lunar_data/PDART_METADATA/XA.1969-1977.0.xml'
+    # metadata_file = '/Users/cnunn/python_packages/apollo_archive/files/metadata.XA.1969-1977.0.csv'
+    '''
+
+
+
 Note that this requires mseed2ascii code. See note below. 
+
+
+
 '''
 
 
@@ -484,7 +561,7 @@ def make_geocsv_xml(output_dir,csv_basename,release_number,geocsv_col):
     # read in the geocsv template
     template_tree_geocsv, product_native_geocsv = load_template('PDS_files/geocsv_template.xml')
 
-    # /Users/cnunn/lunar_data/PDART_PDS_output/xa/continuous_waveform/s12/1976/066/xa.s12.01.mhz.1976.066.1.1.a.csv
+    # /Users/cnunn/lunar_data/pdart_pds_output/xa/continuous_waveform/s12/1976/066/xa.s12.01.mhz.1976.066.1.1.a.csv
 
     net, sta, loc, chan, year, jday, rev, _, _ = csv_basename.lower().split('.')
 
@@ -890,28 +967,21 @@ def archive(release_number):
     logging.info(log_text)
     print(log_text)
 
-    # make a stationxml file which contains ATT 
-    # make_att_metadata(input_metadata,updated_metadata)
-    # print('make metadata file (for geocsv processing), using latest file')
-    # make_metadata(updated_metadata,metadata_file)
+    print('make_dataless_labels')
+    make_dataless_labels(release_number)
+    
+    print('make_stationxml_labels')
+    make_stationxml_labels(release_number)
+    
+    print('copy_seed_files')
+    copy_seed_files(release_number)
 
-    # print('temporary - put these back')
-
-    # 
-    # print('make_dataless_labels')
-    # make_dataless_labels(release_number)
-    # 
-    # print('make_stationxml_labels')
-    # make_stationxml_labels(release_number)
-    # #
-    # # # print('copy_seed_files')
-    # # # copy_seed_files(release_number)
-    # # 
     print('make_seed_labels')
     make_seed_labels(release_number)
-    # #
-    # print('make_geocsv_files')
-    # make_geocsv_files(release_number)
+
+    print('make_geocsv_files')
+    make_geocsv_files(release_number)
+
     print('make_geocsv_labels')
     make_geocsv_labels(release_number)
 
@@ -923,7 +993,6 @@ def make_geocsv_labels(release_number):
 
     # start empty geocsv collection  
     geocsv_col = OrderedDict()
-
 
 
     for (geocsv_filepath, geocsv_basename) in find_files(OUTPUT_DIR, '*.a.csv'):
@@ -949,7 +1018,7 @@ def make_geocsv_labels(release_number):
             
         output_dir = make_dir_lower(OUTPUT_DIR,network=network,data_stream_type=data_stream_type,station=station,year=year,julday=julday)
         # # 
-        # if geocsv_filename=='/Users/cnunn/lunar_data/PDART_PDS_output/xa/continuous_waveform/s12/1976/066/xa.s12.01.mhz.1976.066.1.1.a.csv':
+        # if geocsv_filename=='/Users/cnunn/lunar_data/pdart_pds_output/xa/continuous_waveform/s12/1976/066/xa.s12.01.mhz.1976.066.1.1.a.csv':
         make_geocsv_xml(output_dir,geocsv_basename,release_number,geocsv_col)
 
             # print(geocsv_col)
@@ -1023,7 +1092,7 @@ def make_geocsv_files(release_number):
 
         path_list = seed_filepath.split(os.sep)
         
-        # /Users/cnunn/lunar_data/PDART_PDS_output/xa/continuous_waveform/s17/1976/067
+        # /Users/cnunn/lunar_data/pdart_pds_output/xa/continuous_waveform/s17/1976/067
         # xa.s17.9.mhz.1976.067.1.mseed
         julday = path_list[-1]
         year = path_list[-2]
@@ -1161,7 +1230,7 @@ def make_stationxml_labels(release_number):
     # new collection
     stationxml_col = OrderedDict()
 
-    # /Users/cnunn/lunar_data/PDART_PDS_output/xa/metadata/stationxml.xa.2021.060.sxml
+    # /Users/cnunn/lunar_data/pdart_pds_output/xa/metadata/stationxml.xa.2021.060.sxml
     for (meta_filepath, meta_basename) in find_metadata_output_files(OUTPUT_DIR, 'stationxml*.sxml', case='lower'):
         print(meta_filepath, meta_basename)
         meta_filename = os.path.join(meta_filepath, meta_basename)
@@ -1202,7 +1271,7 @@ def make_seed_labels(release_number):
         print(seed_filename)
 
         path_list = seed_filepath.split(os.sep)
-        # /Users/cnunn/lunar_data/PDART_PDS_output/xa/continuous_waveform/s17/1976/067 
+        # /Users/cnunn/lunar_data/pdart_pds_output/xa/continuous_waveform/s17/1976/067 
 
         # julday = path_list[-1]
         # year = path_list[-2]
@@ -1562,7 +1631,7 @@ def make_metadata(input_metadata,metadata_file):
     # metadata_file = '/Users/cnunn/python_packages/apollo_archive/files/metadata.xb.elyse.2020.345.csv'
     # 
     # # original lunar dataless file 
-    # input_metadata = '/Users/cnunn/lunar_data/PDART_PDS_output/xa/metadata/XA.1969-1977_original.dataless'
+    # input_metadata = '/Users/cnunn/lunar_data/pdart_pds_output/xa/metadata/XA.1969-1977_original.dataless'
     # metadata_file = '/Users/cnunn/python_packages/apollo_archive/files/metadata.XA.1969-1977_original.csv'
     # 
     # # improved lunar stationxml (may still be some errors)
@@ -1626,44 +1695,29 @@ def make_metadata(input_metadata,metadata_file):
 
 if __name__ == "__main__":
 
-    
-
-
-
-    # TODO check all files have correct line endings 
-
-    # copy the metadata file
-    # cp /Users/cnunn/lunar_data/PDART_METADATA/XA.1969-1977.0.xml /Users/cnunn/lunar_data/PDART_PDS_OUTPUT/data/xa/metadata/stationxml.xa.0.sxml
-
-    # make the dataless file 
-    # cd /Users/cnunn/lunar_data/PDART_PDS_OUTPUT/data/xa/metadata
-    # java -jar /Users/cnunn/Applications/stationxml-seed-converter-2.1.0.jar --input stationxml.xa.0.sxml --output dataless.xa.0.seed
 
     # release '1' 
     release_number='1'
-    INPUT_DIR = '/Users/cnunn/lunar_data/PDART/'
-    OUTPUT_DIR = '/Users/cnunn/lunar_data/pdart_pds_output/data/'
-    PREP_DIR = '/Users/cnunn/lunar_data/PDART_PDS_PREP'
+    INPUT_DIR = '/Users/cnunn/lunar_data/PDART_ARCHIVE_TEST/'
+    # to be replaced with:
+    # INPUT_DIR = '/Users/cnunn/lunar_data/PDART_V2/'
 
-    # input_metadata = '/Users/cnunn/lunar_data/PDART_METADATA/XA.1969-1977.0X.xml'
-    # metadata_file = '/Users/cnunn/python_packages/apollo_archive/files/metadata.XA.1969-1977_updated_2019.csv'
-    # updated_metadata = '/Users/cnunn/lunar_data/PDART_METADATA/XA.1969-1977.0Y.xml'
-    # metadata_file = '/Users/cnunn/python_packages/apollo_archive/files/metadata.XA.1969-1977.0.csv'
+    # note that this is a copy of the first version:
+    # /Users/cnunn/lunar_data/pdart_pds_output_v1_sentOct.zip
+    # note that this is a copy of the second version:
+    # /Users/cnunn/lunar_data/ARCHIVE/del_pdart_pds_output
 
+    OUTPUT_DIR = '/Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/data/'
+
+    # this is a a copy of the first version
+    # PDART_PDS_PREP_v1_sentOct.zip
+    PREP_DIR = '/Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep'
+
+    # run each of the sections in turn
     archive(release_number)
 
 
 
 
-
-    # stream = read('/Users/cnunn/lunar_data/PDART/1970/XA/S12/ATT/XA.S12.02.ATT.1970.050.gz')
-    # stream = read('/Users/cnunn/lunar_data/PDART/1976/XA/S12/ATT/XA.S12.15.ATT.1976.055.gz')
-    # 
-    # stream = read('/Users/cnunn/lunar_data/PDART_PDS_output/xa/continuous_waveform/s17/1976/066/xa.s17.06.mhz.1976.066.1.1.mseed')
-    # 
-    # print(stream[0].data[42])
-    # # print(UTCDateTime(stream[0].data[0]))
-    # print(stream[0])
-    # exit()
 
 
