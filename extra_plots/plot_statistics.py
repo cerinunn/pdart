@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 '''
-Plot the Statistics
+Plot the Statistics. The figure didn't make the paper, 
+but the numbers were included in a table. 
 
 grep 'Statistics' /Users/cnunn/lunar_data/PDART_CSV/S12/*.log > /Users/cnunn/lunar_data/PDART_CSV/S12/Statistics.txt
 grep 'Statistics' /Users/cnunn/lunar_data/PDART_CSV/S14/*.log > /Users/cnunn/lunar_data/PDART_CSV/S14/Statistics.txt
@@ -13,9 +14,6 @@ grep 'Statistics' /Users/cnunn/lunar_data/PDART_CSV/work_tapes/*.log > /Users/cn
 
 from __future__ import print_function
 import numpy as np
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from obspy.core.utcdatetime import UTCDateTime
 from matplotlib import gridspec
@@ -26,7 +24,7 @@ from obspy.core.utcdatetime import UTCDateTime
 
 
 import matplotlib  
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
 

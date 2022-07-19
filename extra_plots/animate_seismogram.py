@@ -27,7 +27,7 @@ import pdart.auth as auth
 
 
 import matplotlib  
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 from matplotlib import mlab
 from matplotlib.colors import Normalize
@@ -180,7 +180,7 @@ def animate_seismogram():
 
     # view the animation
     plt.draw()
-    plt.show()
+    # plt.show()
 
     # saves the animation
     anim.save('../extra_plots_output/seismoApollo15XX.mp4', writer = 'ffmpeg')

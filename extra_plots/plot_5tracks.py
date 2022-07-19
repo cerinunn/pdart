@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 
+'''
+Plot all the tracks (MH1, MH2, MHZ, SHZ, and the timing track ATT)
+
+
+'''
+
 from __future__ import print_function
 import numpy as np
 # Qt5Agg seems to work best on Mac - try 'TkAgg' if that works for you
 # put this after the other imports, otherwise it can be overridden
 import matplotlib  
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 from datetime import datetime, timedelta
 from obspy.core.utcdatetime import UTCDateTime
@@ -31,7 +37,7 @@ def five_tracks():
     end_time = start_time + timedelta(minutes=(2+12))
 
     stream = stream_from_directory_new(
-      top_level_dir='/Users/cnunn/lunar_data/PDART',
+      top_level_dir='/Users/cnunn/lunar_data/PDART_V2',
       start_time=start_time,
       stations=stations,
       channels=channels,
