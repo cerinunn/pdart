@@ -142,6 +142,9 @@
           <description>
             Raw counts from miniSEED file.
           </description>
+          <Special_Constants>
+                <missing_constant>-1</missing_constant>
+          </Special_Constants>
         </Field_Delimited>
       </Record_Delimited>
     </Table_Delimited>
