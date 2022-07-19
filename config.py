@@ -1,17 +1,35 @@
 # csv_check_work_tapes.py
 extra_ground_stations = []
 station_order = []
-# how many cumulative records to use as a test
-# it's not clear whether smaller or larger number gives better results 
-# larger requires more adjustments, but may result in fewer deletions
-cumsum_test = 10
+cumsum_test = 10  # not set here, but loops through in the code 
+# from 10, 20, 90 and 180 - used in check_compliance(), which tries to fix
+# any data which don't fit 
+cumsum_final_test = 180 # minimun consecutive records to be exported as a 
+# block - reducing the number (for example to 10) can reduce the number
+# of dropped files
+# lower lets more records through, higher has fewer segments 10 to 180 seem
+# reasonalble
 # time to let the loops run for 
+low_tolerance=0.6009 # used in calculate_gaps() to determine whether 
+# it is a single gap between the current frame and the previous one 
+high_tolerance=0.6071# used in calculate_gaps() to determine whether 
+# it is a single gap between the current frame and the previous one 
+lower_tolerance=0.5538 # used in the final calculation for 
+# whether a record is good, and therefore included in the output 
+higher_tolerance=0.6538 # used in the final calculation for 
+# whether a record is good, and therefore included in the output 
+low_single_gap=0.6009 # controls behaviour of calculate_gaps() - which 
+# helps check_compliance() check the data and remove any that don't fit
+# correct data generally fall within a narrow range 
+high_single_gap=0.6071 # controls behaviour of calculate_gaps() - which 
+# helps check_compliance() check the data and remove any that don't fit
 time_test = 5*60 # in seconds
 # use this setting to read the data in and make some checks
 initial=False
 last_station=None
 last_timestamp=None
 last_orig_idx=None
+
 
 # csv_join_work_tapes.py
 combine_ground_stations=True
