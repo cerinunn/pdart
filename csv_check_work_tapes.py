@@ -43,6 +43,16 @@ df_gst, df_dropped, df_orig, rec_fixed_frame, rec_fixed_simple_timestamp, rec_ad
         dataframe.
         df_gst = station_fix_missing_timestamps2(df_gst)
 
+    split_good_records
+    finally, save the good files and the dropped files (note that the dropped files 
+    are concatenated - so bear the timestamp of the first record)
+    if there are a lot of missed records, then reducing config.cumsum_final_test
+    to a smaller number (e.g. 10), may reduced the missed records
+    (but make require some manual corrections at the join stage)
+
+    See also the notes in config.py - there are some adjustable parameters.
+
+
 
 
 
@@ -189,6 +199,11 @@ def csv_check_work_tapes(gzip_filename,single_station=None,
     logging.info(gzip_filename)
     logging.info('############################################')
     print(gzip_filename)
+
+    logging.info('config.low_tolerance={}'.format(config.low_tolerance))
+    logging.info('config.high_tolerance={}'.format(config.high_tolerance))
+    logging.info('config.lower_tolerance={}'.format(config.lower_tolerance))
+    logging.info('config.higher_tolerance={}'.format(config.higher_tolerance))
     
     df = None
     df = pd.read_csv(gzip_filename, dtype=str)
@@ -322,10 +337,6 @@ def csv_check_work_tapes(gzip_filename,single_station=None,
         global df_orig_shown
         df_orig_shown = False
 
-        # check for duplicates
-        # station_ground_station_overlap(df_gst)
-
- # print('temporarily removed - may bring this back')
         if config.initial:
             # use this setting to view large breaks and gaps 
             station_test_missing_timestamps(df_gst,gzip_filename)
@@ -353,6 +364,13 @@ def csv_check_work_tapes(gzip_filename,single_station=None,
             if cumsum_test > 10:
                 logging.info('WARNING: Ground station/Station - {} {} Using cumsum_test={}'.format(
                   corr_ground_station, orig_station,cumsum_test))
+
+            if cumsum_test == 180:
+                logging.debug('------------------')
+                logging.debug(df_orig.tail().to_string())
+                logging.debug(df_dropped.tail().to_string())
+                logging.debug(df_gst.tail().to_string())
+                logging.debug('------------------')
             
             # # there's no reason to carry on if all records have been deleted 
             # if len(df_gst) == 0:
@@ -391,11 +409,16 @@ def csv_check_work_tapes(gzip_filename,single_station=None,
             # this looks at any that have already been fixed 
             df_gst = calculate_cumsum2(df_gst)
 
+            logging.info('still there?')
+            logging.debug(df_gst.to_string())
+            logging.info('still there?')
+            
+
             df_list1, df_list_bad = split_good_records(df_gst)
 
+            
+
             for df1 in df_list1:
-
-
 
                 # make some final checks to make sure it works 
                 df1 = station_final_check(df1, df_orig)
@@ -3742,7 +3765,7 @@ def make_bad_dataframes(df_gst,low,high):
 
 def find_good_records(lst):
 
-    # search backwards for first value greater than cumsum_test
+    # search backwards for first value greater than cumsum_final_test
     end_idx = len(lst) - 1
     high = []
     low = []
@@ -3751,7 +3774,7 @@ def find_good_records(lst):
 
         idx = None
         try:
-            idx_backward = next(x[0] for x in enumerate(lst[end_idx::-1]) if x[1] >= config.cumsum_test)
+            idx_backward = next(x[0] for x in enumerate(lst[end_idx::-1]) if x[1] >= config.cumsum_final_test)
             idx = end_idx - idx_backward
             high.append(idx)
         except StopIteration:
@@ -3786,7 +3809,10 @@ def find_good_records(lst):
 
 def split_good_records(df_gst):
 
-    config.cumsum_test = 180
+
+    # logging.debug('split_good_records')
+    # logging.debug(df_gst.to_string())
+    # logging.debug('still a game??')
 
     cumsum2 = df_gst['cumsum2'].tolist()
 
@@ -4813,7 +4839,7 @@ def calculate_gaps(df_gst):
             #     print('weird!!')
             #     logging.info('weird!!!')
                 # single_gap, actual_frame_gap, full_frames_est, time_error, percent_error = frame_diff_positive(last_frame,new_frame,corr_gap,delta4=delta4_mean,frame_correction=-3)
-            if single_gap > 0.6009 and single_gap < 0.6071:
+            if single_gap > config.low_single_gap and single_gap < config.high_single_gap:
                 df_gst.at[i,'corr_gap_count'] = actual_frame_gap
 
 
