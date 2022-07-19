@@ -28,7 +28,7 @@ from obspy.core import Stream, Trace, Stats, read
 from obspy.core.utcdatetime import UTCDateTime
 
 import matplotlib  
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
 DELTA = 0.1509433962
@@ -139,10 +139,13 @@ def relative_timing_stream(stream,remove_original=True):
     :param remove_original: If set to ``True``, the original ATT trace is removed.
         Otherwise, a new trace is added to the stream. Defaults to True.
     """
-    stream.merge()
+    # remove the negative ones where there are data gaps
+
+    # stream.merge()
     
     for tr in stream:
         if tr.stats.channel == 'ATT' :
+            remove_negative_ones_trace(tr)
             if remove_original: 
                 tr_divergence = tr
             else:
@@ -182,6 +185,7 @@ def relative_timing_trace(trace):
     :param trace: A timing trace
     """
     if trace.stats.channel == 'ATT' :
+        remove_negative_ones_trace(trace)
         trace.stats.channel = 'ATT_DIVERGENCE'
         # get the mask if there is one (when there are data gaps)
         if isinstance(trace.data, np.ma.MaskedArray):
@@ -198,7 +202,7 @@ def relative_timing_trace(trace):
         if mask is not None:
             trace.data = ma.array(trace.data, mask=mask)    
 
-def remove_negative_ones(stream):
+def remove_negative_ones(stream,channels=['MH1','MH2','MHZ','SHZ','ATT']):
     """Snippet to remove the -1 values in the data traces. 
 
     The SHZ traces have missing data samples 3-4 times every 32 samples. 
@@ -209,8 +213,26 @@ def remove_negative_ones(stream):
     """
 
     for tr in stream:
-        if tr.stats.channel in ('MH1','MH2','MHZ','SHZ'):
-            tr.data= np.ma.masked_where(tr.data==-1, tr.data)
+        if tr.stats.channel in channels:
+            if tr.stats.channel in ('MH1','MH2','MHZ','SHZ'):
+                tr.data = np.ma.masked_where(tr.data==-1, tr.data)
+            elif tr.stats.channel in ('ATT'):
+                tr.data = np.ma.masked_values(tr.data,-1.0)
+
+def remove_negative_ones_trace(trace):
+    """Snippet to remove the -1 values in the data traces. 
+
+    The SHZ traces have missing data samples 3-4 times every 32 samples. 
+    Providing the seed data with these missing data would mean using very 
+    large files. Instead, we provide the data with -1 replacing the gaps. 
+    To change the files to include the gaps, use this simple method to 
+    replace the -1 values. 
+    """
+
+    if trace.stats.channel in ('MH1','MH2','MHZ','SHZ'):
+        trace.data = np.ma.masked_where(trace.data==-1, tr.data)
+    elif trace.stats.channel in ('ATT'):
+        trace.data = np.ma.masked_values(trace.data,-1.0)
 
 def linear_interpolation(trace,interpolation_limit=1):
     """Snippet to interpolate missing data.  
