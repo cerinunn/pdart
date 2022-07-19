@@ -1,14 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Import the data from the binary tape files - old format data.
+Import the data from the binary tape files.
 Be careful to make sure that every part of the record is read - otherwise
 the file positions will be out for the next record.
-
-
-# These packages are currently being run on env36. 
-
-# THIS IS NEW!!!!!!
 
 
 :copyright:
@@ -145,24 +140,31 @@ def year_corrections(filename,year):
     The following files have an incorrect year specified
     '''
     file_list = [
-        'pse.a12.10.91',
-        'pse.a12.10.92',
-        'pse.a12.10.93',
-        'pse.a12.10.94',
-        'pse.a12.10.95',
-        'pse.a12.10.97',
-        'pse.a12.10.98',
-        'pse.a12.10.102',
-        'pse.a12.10.103',
-        'pse.a12.10.104',
-        'pse.a12.10.106',
-        'pse.a12.10.107',
-        'pse.a12.10.108',
-        'pse.a12.10.109',
-        'pse.a12.10.111']
+        'pse.a12.10.91.gz',
+        'pse.a12.10.92.gz',
+        'pse.a12.10.93.gz',
+        'pse.a12.10.94.gz',
+        'pse.a12.10.95.gz',
+        'pse.a12.10.97.gz',
+        'pse.a12.10.98.gz',
+        'pse.a12.10.102.gz',
+        'pse.a12.10.103.gz',
+        'pse.a12.10.104.gz',
+        'pse.a12.10.106.gz',
+        'pse.a12.10.107.gz',
+        'pse.a12.10.108.gz',
+        'pse.a12.10.109.gz',
+        'pse.a12.10.111.gz']
 
     if os.path.basename(filename) in file_list:
         year = 1976
+        print('Year corrected for ', filename, year)
+
+    file_list = [
+        'pse.a14.8.112.gz']
+
+    if os.path.basename(filename) in file_list:
+        year = 1974
         print('Year corrected for ', filename, year)
 
     return year
@@ -701,7 +703,6 @@ def binary_import_main_tapes(filename, out_filename_gz,
         df['shz_62'] = df['shz_62'].astype('Int64')
         df['shz_64'] = df['shz_64'].astype('Int64')
 
-    print('here')
     print(filename)
     df = clean_year(filename,df)
 
@@ -714,20 +715,6 @@ def binary_import_main_tapes(filename, out_filename_gz,
     df.to_csv(out_filename_gz,index=False,date_format='%Y-%m-%dT%H:%M:%S.%fZ',quoting=csv.QUOTE_NONNUMERIC)
     
     return
-
-def clean_year(filename,df):
-    # XXXXX
-    # if 'pse.a12.1.43' in filename:
-    #     print('Fixing year for part of file pse.a12.3.62.csv')
-    #     logging.info('Fixing year for part of file pse.a12.3.62.csv')
-    #     year_diff = 31536000
-    #     df['year_diff'] = 0
-    #     df.at[57600:143414+1,'year_diff']= year_diff
-    #     df['orig_timestamp'] = pd.to_datetime(df['orig_timestamp']) + pd.to_timedelta(df['year_diff'], unit='s')
-    #     df.drop('year_diff', axis=1, inplace = True)
-    print('temp removed')
-
-    return df
 
 def import_csv_main_tapes(base_dir, out_base_dir, filenames=None):
     # filenames (default = None) - if specified, then read only these filenames 
