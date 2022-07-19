@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Example file to run initial checks on the csv files.
+Run initial checks on csv files - S11 (main tapes)
 
 :copyright:
     The PDART Development Team & Ceri Nunn
