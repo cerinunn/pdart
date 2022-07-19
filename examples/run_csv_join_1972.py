@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Example file to run initial checks on the csv files.
+Run csv_join_work_tapes for 1972.
 
 :copyright:
     The PDART Development Team & Ceri Nunn
@@ -26,28 +26,28 @@ import numpy as np
 
 def run_csv_join_work_tapes():
     processed_dir='/Users/cnunn/lunar_data/PDART_PROCESSED'
-    join_dir='/Users/cnunn/lunar_data/PDART'
+    join_dir='/Users/cnunn/lunar_data/PDART_V2'
     config.combine_ground_stations=True
     config.clean_spikes=True
     print('MAKE SURE THAT THESE ARE RERUN PROPERLY ')
 
-    # processed_dir='/Users/cnunn/lunar_data/PDART_PROCESSED'
-    # join_dir='/Users/cnunn/lunar_data/PDART_SEPARATE_GROUND_STATIONS
-    # config.combine_ground_stations=False
-    # config.clean_spikes=False
-
-
-
     config.view_corrected_traces = False
+    config.fix_clock_error = True
+    config.fix_jump_error = True
     call_csv_join_work_tapes(
     processed_dir=processed_dir,
     join_dir=join_dir,
-    log_dir=processed_dir,
+    log_dir=join_dir,
     year_start=1972,
     year_end=1972,
     day_start=1,
     day_end=366,
     stations=['S12','S14','S15','S16'],
+    manual_clock_correction='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_clock_fix.csv',
+    manual_jump_correction='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_jump_fix.csv',
+    manual_exclude='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_exclude.csv',
+    manual_grab_before='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_grab_before.csv',
+    manual_grab_after='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_grab_after.csv',
     logging_level=logging.INFO)
 
 

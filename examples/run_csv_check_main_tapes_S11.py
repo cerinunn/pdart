@@ -60,6 +60,13 @@ def run_csv_check_work_tapes():
         # ,single_ground_station=10
         )
 
+    print('Also remember to run final_csv_check_main_tapes_all.py!!!!!')
+    # final_csv_check_main_tapes_all.py contains a few files with specific settings 
+    # when the timing wasn't that great
+
+
+
+
 
 if __name__ == "__main__":
 
