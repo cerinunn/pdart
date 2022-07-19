@@ -3,6 +3,13 @@
 """
 Run initial checks on csv files - S14 (main tapes)
 
+Make checked csv files (will drop some damaged data)
+out of the raw csv files extracted from binary. 
+
+Remember to run final_csv_check_main_tapes_all.py AFTER this file, 
+which uses slightly different paramters for some of the files which 
+didn't have good data recovery.
+
 :copyright:
     The PDART Development Team & Ceri Nunn
 :license:

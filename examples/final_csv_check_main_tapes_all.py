@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-File to run with config.cumsum_final_test = 10.
+Final file to run initial checks on csv files
+
+Make checked csv files (will drop some damaged data)
+out of the raw csv files extracted from binary. 
+
+This file will run with config.cumsum_final_test = 10.
 This will recover more data, but in smaller 
 file chucks - and they will need checking manaully.
 Used for important events where the timing was 
-sporadic. 
+sporadic.
 
 :copyright:
     The PDART Development Team & Ceri Nunn
