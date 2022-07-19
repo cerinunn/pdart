@@ -1,15 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
 """
+Run initial checks on csv files
 
-:copyright:
-    The pdart Development Team & Ceri Nunn
-:license:
-    GNU Lesser General Public License, Version 3
-    (https://www.gnu.org/copyleft/lesser.html)
-
+Make checked csv files (will drop some damaged data)
+out of the raw csv files extracted from binary. 
 
 This uses the following workflow:
 
@@ -52,10 +48,11 @@ df_gst, df_dropped, df_orig, rec_fixed_frame, rec_fixed_simple_timestamp, rec_ad
 
     See also the notes in config.py - there are some adjustable parameters.
 
-
-
-
-
+:copyright:
+    The pdart Development Team & Ceri Nunn
+:license:
+    GNU Lesser General Public License, Version 3
+    (https://www.gnu.org/copyleft/lesser.html)
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
