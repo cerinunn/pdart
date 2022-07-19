@@ -46,11 +46,11 @@ def run_csv_join_work_tapes():
     day_start=1,
     day_end=366,
     stations=['S12','S14','S15','S16'],
-    manual_clock_correction='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_clock_fix.csv',
-    manual_jump_correction='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_jump_fix.csv',
-    manual_exclude='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_exclude.csv',
-    manual_grab_before='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_grab_before.csv',
-    manual_grab_after='/Users/cnunn/lunar_data/PDART_MANUAL_FIX/manual_grab_after.csv',
+    manual_clock_correction='../manual_fix_files/manual_clock_fix.csv',
+    manual_jump_correction='../manual_fix_files/manual_jump_fix.csv',
+    manual_exclude='../manual_fix_files/manual_exclude.csv',
+    manual_grab_before='../manual_fix_files/manual_grab_before.csv',
+    manual_grab_after='../manual_fix_files/manual_grab_after.csv',
     logging_level=logging.INFO)
 
 
