@@ -34,6 +34,8 @@ from obspy.core.utcdatetime import UTCDateTime
 from obspy.core import Stream, Trace, Stats, read
 from obspy.imaging.util import ObsPyAutoDateFormatter
 from urllib.request import Request, build_opener, HTTPError
+from pdart.csv_join_work_tapes import make_dir
+from pdart.util import remove_negative_ones
 
 
 import matplotlib
@@ -42,11 +44,11 @@ import matplotlib.pyplot as plt
 
 
 global DELTA
-DELTA = 0.15094
+DELTA = 0.1509
 FULL_DELTA = 16/106
 SECONDS_PER_DAY = 3600.0 * 24.0
 
-
+INVALID_99 = -99.0
 # 
 # def plot_from_stream(
 #     stream=None,
@@ -483,288 +485,313 @@ def read_solar_presence(
 # 
 #     return stream
 
-# # used 2 November
-# def plot_overview_from_stream(
-#     stream,
-#     channel='ASI',
-#     stations=['S11','S12','S14','S15','S16'],
-#     ylim = (480 - 100, 480 + 100),
-#     start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
-#     end_time=UTCDateTime('1977-09-30T21:00:00.000000Z'),
-#     plot_solar_presence=True,
-#     solar_presence_dir='../solar_presence/',
-#     plot_time_delays=False,
-#     time_delays_dir='../time_delays/',
-#     merge_locations=False,
-#     save_pdf=False,
-#     outfile=None):
-#     '''
-#     Plot an overview
-#     '''
-# 
-#     stream = stream.sort(keys=['starttime'])
-# 
-#     if merge_locations:
-#         for tr in stream:
-#             tr.stats.location = ''
-# 
-#     if plot_solar_presence:
-#         solar_presence_times = read_solar_presence(solar_presence_dir=solar_presence_dir)
-# 
-#     if plot_time_delays:
-#         time_delays = read_time_delays(time_delays_dir=time_delays_dir)
-# 
-#     if len(stream) > 0:
-# 
-#         # check which stations were found
-#         # stations = sorted(stations)
-#         # for station in stations:
-#         #     # make new list with just the ones with data
-#         #     stations[:] = [stat for stat in stations if (stream.select(station=stat).count() > 0)]
-# 
-#         fig = stream.plot(handle=True,size=(1200,600),show=False)
-#     # ,method='full')
-#         # clear the suptitle which has already been set
-#         fig.suptitle('')
-#         axes = fig.get_axes()
-#         if len(axes) == 3:
-#             height = 6 *0.75
-#         else:
-#             height = 6
-#         fig.set_size_inches(12, height)
-#         # for ax in axes:
-#         #     ax.axhline(y=DELTA, color='r')
-#         #
-#         #     if ylim is None:
-#         #         if channel == 'ASI':
-#         #             # ax.set_ylim(0.150925,0.150955)
-#         #             ax.set_ylim(0.116,0.189)
-#         #             # pass
-#         #     else:
-#         #         ax.set_ylim(ylim)
-#         #     # don't use scientific notation for the y axis
-#         #     ax.ticklabel_format(useOffset=False,axis='y')
-#         # plt.show()
-# 
-#         plt.ylabel('s')
-#         for i, ax in enumerate(axes):
-#             # view unaveraged time diffs
-#             # ax.set_ylim(0.14,0.16)
-#             # per frame time diffs
-# 
-# 
-#             # print(handles)
-#             # print(labels)
-#             # print('bingo')
-#             # exit()
-# 
-#             if i == 0:
-#                 if channel == 'ASI':
-#                     ax.set_title('Average Sampling Interval')
-#                 else:
-#                     ax.set_title('Overview - {}'.format(channel))
-# 
-# 
-#             if channel == 'ASI':
-#                 ax.axhline(y=FULL_DELTA, color='r')
-# 
-#             if ylim is None:
-#                 if channel == 'ASI':
-#                     ax.set_ylim(0.150925,0.150955)
-#                     # ax.set_ylim(0.116,0.189)
-#             else:
-#                 ax.set_ylim(ylim)
-#             # don't use scientific notation for the y axis
-#             ax.ticklabel_format(useOffset=False,axis='y')
-#             if channel == 'ASI':
-#                 ax.set_ylabel('seconds')
-#             else:
-#                 ax.set_ylabel('DU')
-#             # customise the tick locations
-#             locator = AutoDateLocator(minticks=3, maxticks=9)
-#             ax.xaxis.set_major_formatter(ObsPyAutoDateFormatter(locator))
-#             ax.xaxis.set_major_locator(locator)
-# 
-#             # customise the minor tick locations
-#             locator = MonthLocator()
-#             ax.xaxis.set_minor_locator(locator)
-# 
-#             # find the x axis (note the axis uses matplotlib dates)
-#             (xlim_min, xlim_max) = ax.get_xlim()
-# 
-#             if plot_time_delays:
-#                 # get the time_delays for this station
-#                 station_time_delay_dates = []
-#                 station_time_delays = []
-#                 for (time_delay_station, time_delay_date, time_delay) in time_delays:
-#                     if time_delay_station == stations[i]:
-#                         # change UTCDateTime to the right format
-#                         station_time_delay_dates.append(date2num(time_delay_date.datetime))
-#                         station_time_delays.append(time_delay)
-# 
-#             if plot_solar_presence:
-#                 # using the labels - we can find which station is plotted on
-#                 # this axis
-#                 for child in ax.get_children():
-#                     if isinstance(child, matplotlib.text.Text):
-#                         label = child.get_text()
-#                         if label != '' and label.split('.')[0] == 'XA':
-#                             ax_station = label.split('.')[1]
-# 
-#                             # print(solar_presence_times)
-# 
-#                             # first get the ones that apply
-#                             station_solar_presence_times = []
-#                             for (solar_presence_station, s_datetime, solar_presence) in solar_presence_times:
-#                                 # print(solar_presence_station, ax_station)
-#                                 if solar_presence_station == ax_station:
-#                                     # solar_mark = date2num(s_datetime.datetime)
-#                                     # print(solar_mark)
-#                                     # if solar_mark >= xlim_min and solar_mark <= xlim_max:
-#                                     station_solar_presence_times.append((solar_presence_station, s_datetime, solar_presence))
-#                                 # else:
-#                                 #     print(solar_presence_station)
-# 
-#                             # print(station_solar_presence_times)
-#                             # exit()
-# 
-#                             for i, (solar_presence_station, s_datetime, solar_presence) in enumerate(station_solar_presence_times):
-#                                 start_shade = None
-#                                 end_shade = None
-#                                 # sunrise
-#                                 if solar_presence == 'r':
-#                                     end_shade = date2num(s_datetime.datetime)
-#                                     # find the last time the sun set (or the begining)
-#                                     if i == 0:
-#                                         start_shade = xlim_min
-#                                     else:
-#                                         start_shade = station_solar_presence_times[i-1][1]
-#                                         start_shade = date2num(start_shade)
-# 
-#                                     ax.axvspan(start_shade, end_shade, facecolor='b', alpha=0.3)
-# 
-#                             # deal with the last one
-#                             start_shade = None
-#                             end_shade = None
-#                             if solar_presence == 's':
-#                                 start_shade = date2num(s_datetime.datetime)
-#                                 end_shade = xlim_max
-#                                 ax.axvspan(start_shade, end_shade, facecolor='b', alpha=0.3)
-# 
-#             if plot_time_delays:
-#                 ax2 = ax.twinx()
-#                 ax2.plot(station_time_delay_dates, station_time_delays, 'g-')
-#                 ax2.set_xlim((xlim_min, xlim_max))
-#                 ax2.set_ylabel('seconds')
-#                 ax2.set_ylim(0.95,1.75)
-# 
-#         # tight_layout to set the space around the plot properly
-#         # plt.tight_layout()
-#         xlim_min = date2num(start_time.datetime)
-#         xlim_max = date2num(end_time.datetime)
-#         plt.xlim(xlim_min, xlim_max)
-# 
-#         plt.subplots_adjust(left=0.09, bottom=0.08, right=0.95, top=0.93)
-#         if save_pdf:
-#             print(outfile)
-#             plt.savefig(outfile)
-#         else:
-#             plt.show()
-#     else:
-#         print('No streams found.')
+def plot_overview_from_stream(
+    stream,
+    channel='ASI',
+    stations=['S11','S12','S14','S15','S16'],
+    ylim = (480 - 100, 480 + 100),
+    ylim_masking = False, # mask values outside the ylimits 
+    start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
+    end_time=UTCDateTime('1977-09-30T21:00:00.000000Z'),
+    plot_solar_presence=True,
+    solar_presence_dir='../Electronic_Supplement/files/solar_presence/',
+    # plot_time_delays=False,
+    # time_delays_dir='../time_delays/',
+    merge_locations=False,
+    save_pdf=False,
+    outfile=None):
+    '''
+    Plot an overview
+    '''
 
-# # # used 2 November
-# def plot_overview_from_file(
-#     stations=['S11','S12','S14','S15','S16'],
-#     channels=['ASI'],
-#     ylim=None,
-#     file_dir='.',
-#     pdf_dir='.',
-#     start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
-#     end_time=UTCDateTime('1977-09-30T21:00:00.000000Z'),
-#     read_gzip=True,
-#     plot_solar_presence=True,
-#     solar_presence_dir='../solar_presence/',
-#     plot_time_delays=False,
-#     time_delays_dir='../time_delays/',
-#     merge_locations=False,
-#     save_pdf=False):
-# 
-#     '''
-#     Calls the method which plots the overview - including the Sampling Interval
-#     '''
-# 
-#     # check that the overall directory exists
-#     if not os.path.exists(pdf_dir):
-#         msg = ("The directory {} doesn't exist".format(pdf_dir))
-#         raise IOError(msg)
-# 
-#     # original_channel = None
-#     # if channels == ['ASI']:
-#     #     channels = ['ATT']
-#     #     original_channel = 'ASI'
-# 
-#     time_interval = timedelta(hours=24)
-#     for channel in channels:
-#         read_stream = Stream()
-#         for station in stations:
-#             start = start_time
-#             while start < end_time:
-# 
-#                 year = start.year
-#                 julday = start.julday
-# 
-#                 filename = find_filename_date(station, '*', channel, start)
-#                 filename = os.path.join(file_dir,str(year),'XA', station,channel,filename)
-# 
-# 
-#                 if read_gzip:
-#                     filename = '%s.gz' % (filename)
-# 
-#                 # check that the file pattern exists
-#                 if not glob.glob(filename):
-#                     msg = 'view.py cannot find file: {}'.format(filename)
-#                     print(msg)
-#                     logging.info(msg)
-#                     # increment the time interval
-#                     start += time_interval
-#                     continue
-# 
-#                 stream = read(filename)
-#                 read_stream += stream
-# 
-#                 # increment the time interval
-#                 start += time_interval
-# 
-#         outfile = 'overview_%s_%s_%s.png' % (channel, start_time.strftime("%Y-%m-%d"), end_time.strftime("%Y-%m-%d"))
-#         outfile = os.path.join(pdf_dir,outfile)
-# 
-# 
-#         # if original_channel is not None:
-#         #     for tr in read_stream:
-#         #         tr.stats.channel = 'ASI'
-#         #         if len(tr) > 2:
-#         #             tr.data = np.diff(tr.data)
-#         #         else:
-#         #             read_stream.remove(tr)
-#         #
-#         #     channel = original_channel
-# 
-#         # print(read_stream)
-#         plot_overview_from_stream(
-#           read_stream,
-#           channel=channel,
-#           stations=stations,
-#           ylim=ylim,
-#           start_time=start_time,
-#           end_time=end_time,
-#           plot_solar_presence=plot_solar_presence,
-#           solar_presence_dir=solar_presence_dir,
-#           plot_time_delays=plot_time_delays,
-#           time_delays_dir=time_delays_dir,
-#           merge_locations=merge_locations,
-#           save_pdf=save_pdf,
-#           outfile=outfile)
+
+    stream = stream.sort(keys=['starttime'])
+
+    if merge_locations:
+        for tr in stream:
+            tr.stats.location = ''
+
+    # sometimes small (probably non existant) differences in the floats seem to throw errors
+    for tr in stream:
+        tr.stats.delta = round(tr.stats.delta,8)
+
+    # remove the masks
+    for tr in stream: 
+        if tr.stats.channel in ('ASI'):
+            tr.data = np.ma.masked_values(tr.data,-99.0)
+
+
+    print(solar_presence_dir)
+    if plot_solar_presence:
+        solar_presence_times = read_solar_presence(solar_presence_dir=solar_presence_dir)
+
+    # if plot_time_delays:
+    #     time_delays = read_time_delays(time_delays_dir=time_delays_dir)
+
+    # plot using the sampling rate of the mid-period channels (4 x smaller
+    # than 'ATT')
+    for tr in stream: 
+        tr.data = tr.data/4.0
+
+        if ylim_masking:
+            tr.data = ma.masked_where(tr.data <= ylim[0], tr.data)
+            tr.data = ma.masked_where(tr.data >= ylim[1], tr.data)
+
+
+    stream.merge()
+
+    if len(stream) > 0:
+
+        # check which stations were found
+        # stations = sorted(stations)
+        # for station in stations:
+        #     # make new list with just the ones with data
+        #     stations[:] = [stat for stat in stations if (stream.select(station=stat).count() > 0)]
+
+        fig = stream.plot(handle=True,size=(1200,600),show=False)
+    # ,method='full')
+        # clear the suptitle which has already been set
+        fig.suptitle('')
+        axes = fig.get_axes()
+        if len(axes) == 3:
+            height = 6 *0.75
+        else:
+            height = 6
+        fig.set_size_inches(12, height)
+        # for ax in axes:
+        #     ax.axhline(y=DELTA, color='r')
+        #
+        #     if ylim is None:
+        #         if channel == 'ASI':
+        #             # ax.set_ylim(0.150925,0.150955)
+        #             ax.set_ylim(0.116,0.189)
+        #             # pass
+        #     else:
+        #         ax.set_ylim(ylim)
+        #     # don't use scientific notation for the y axis
+        #     ax.ticklabel_format(useOffset=False,axis='y')
+        # plt.show()
+
+        plt.ylabel('s')
+        for i, ax in enumerate(axes):
+            # view unaveraged time diffs
+            # ax.set_ylim(0.14,0.16)
+            # per frame time diffs
+
+            # print(handles)
+            # print(labels)
+
+            if i == 0:
+                if channel == 'ASI':
+                    ax.set_title('Average Sampling Interval')
+                else:
+                    ax.set_title('Overview - {}'.format(channel))
+
+
+            if channel == 'ASI':
+                ax.axhline(y=FULL_DELTA, color='r')
+
+            if ylim is None:
+                if channel == 'ASI':
+                    ax.set_ylim(0.150925,0.150955)
+                    # ax.set_ylim(0.116,0.189)
+            else:
+                ax.set_ylim(ylim)
+            # don't use scientific notation for the y axis
+            ax.ticklabel_format(useOffset=False,axis='y')
+            if channel == 'ASI':
+                ax.set_ylabel('seconds')
+            else:
+                ax.set_ylabel('DU')
+            # customise the tick locations
+            locator = AutoDateLocator(minticks=3, maxticks=9)
+            ax.xaxis.set_major_formatter(ObsPyAutoDateFormatter(locator))
+            ax.xaxis.set_major_locator(locator)
+
+            # customise the minor tick locations
+            locator = MonthLocator()
+            ax.xaxis.set_minor_locator(locator)
+
+            # find the x axis (note the axis uses matplotlib dates)
+            (xlim_min, xlim_max) = ax.get_xlim()
+
+            # if plot_time_delays:
+            #     # get the time_delays for this station
+            #     station_time_delay_dates = []
+            #     station_time_delays = []
+            #     for (time_delay_station, time_delay_date, time_delay) in time_delays:
+            #         if time_delay_station == stations[i]:
+            #             # change UTCDateTime to the right format
+            #             station_time_delay_dates.append(date2num(time_delay_date.datetime))
+            #             station_time_delays.append(time_delay)
+
+            if plot_solar_presence:
+                # using the labels - we can find which station is plotted on
+                # this axis
+                for child in ax.get_children():
+                    if isinstance(child, matplotlib.text.Text):
+                        label = child.get_text()
+                        if label != '' and label.split('.')[0] == 'XA':
+                            ax_station = label.split('.')[1]
+
+                            # print(solar_presence_times)
+
+                            # first get the ones that apply
+                            station_solar_presence_times = []
+                            for (solar_presence_station, s_datetime, solar_presence) in solar_presence_times:
+                                # print(solar_presence_station, ax_station)
+                                if solar_presence_station == ax_station:
+                                    # solar_mark = date2num(s_datetime.datetime)
+                                    # print(solar_mark)
+                                    # if solar_mark >= xlim_min and solar_mark <= xlim_max:
+                                    station_solar_presence_times.append((solar_presence_station, s_datetime, solar_presence))
+                                # else:
+                                #     print(solar_presence_station)
+
+                            # print(station_solar_presence_times)
+
+                            for i, (solar_presence_station, s_datetime, solar_presence) in enumerate(station_solar_presence_times):
+                                start_shade = None
+                                end_shade = None
+                                # sunrise
+                                if solar_presence == 'r':
+                                    end_shade = date2num(s_datetime.datetime)
+                                    # find the last time the sun set (or the begining)
+                                    if i == 0:
+                                        start_shade = xlim_min
+                                    else:
+                                        start_shade = station_solar_presence_times[i-1][1]
+                                        start_shade = date2num(start_shade.datetime)
+
+                                    ax.axvspan(start_shade, end_shade, facecolor='b', alpha=0.3)
+
+                            # deal with the last one
+                            start_shade = None
+                            end_shade = None
+                            if solar_presence == 's':
+                                start_shade = date2num(s_datetime.datetime)
+                                end_shade = xlim_max
+                                ax.axvspan(start_shade, end_shade, facecolor='b', alpha=0.3)
+
+            # if plot_time_delays:
+            #     ax2 = ax.twinx()
+            #     ax2.plot(station_time_delay_dates, station_time_delays, 'g-')
+            #     ax2.set_xlim((xlim_min, xlim_max))
+            #     ax2.set_ylabel('seconds')
+            #     ax2.set_ylim(0.95,1.75)
+
+        # tight_layout to set the space around the plot properly
+        # plt.tight_layout()
+        xlim_min = date2num(start_time.datetime)
+        xlim_max = date2num(end_time.datetime)
+        plt.xlim(xlim_min, xlim_max)
+
+        plt.subplots_adjust(left=0.09, bottom=0.08, right=0.95, top=0.93)
+        if save_pdf:
+            print(outfile)
+            plt.savefig(outfile)
+            plt.show()
+        else:
+            plt.show()
+    else:
+        print('No streams found.')
+
+def plot_overview_from_file(
+    stations=['S11','S12','S14','S15','S16'],
+    channels=['ASI'],
+    ylim=None,
+    ylim_masking = False, # mask values outside the ylimits 
+    overview_top_level_dir='.',
+    pdf_dir='.',
+    start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
+    end_time=UTCDateTime('1977-09-30T21:00:00.000000Z'),
+    read_gzip=True,
+    plot_solar_presence=True,
+    solar_presence_dir='../Electronic_Supplement/files/solar_presence/',
+    # plot_time_delays=False,
+    # time_delays_dir='../time_delays/',
+    merge_locations=False,
+    save_pdf=False):
+
+    '''
+    Calls the method which plots the overview - including the Sampling Interval
+    '''
+
+    # check that the overall directory exists
+    if not os.path.exists(pdf_dir):
+        msg = ("The directory {} doesn't exist".format(pdf_dir))
+        raise IOError(msg)
+
+    # original_channel = None
+    # if channels == ['ASI']:
+    #     channels = ['ATT']
+    #     original_channel = 'ASI'
+
+    time_interval = timedelta(hours=24)
+    read_stream = Stream()
+    start = start_time
+    print(start_time, end_time) 
+    while start < end_time:
+        for channel in channels:
+            for station in stations:
+
+                year = start.year
+                julday = start.julday
+
+                file_dir = find_dir_upper(top_level_dir=overview_top_level_dir,station=station,starttime=start)
+                av_filename = find_filename_date_upper(station, '*', 'ASI', start)
+                filename = os.path.join(file_dir,av_filename)
+
+                if read_gzip:
+                    filename = '%s.gz' % (filename)
+
+                # check that the file pattern exists
+                if not glob.glob(filename):
+                    msg = 'view.py cannot find file: {}'.format(filename)
+                    print(msg)
+                    logging.info(msg)
+                    # # increment the time interval
+                    # start += time_interval
+                    continue
+
+                stream = read(filename)
+                read_stream += stream
+
+        # increment the time interval
+        start += time_interval
+
+
+    outfile = 'overview_%s_%s_%s.png' % (channel, start_time.strftime("%Y-%m-%d"), end_time.strftime("%Y-%m-%d"))
+    outfile = os.path.join(pdf_dir,outfile)
+
+    
+
+    # if original_channel is not None:
+    #     for tr in read_stream:
+    #         tr.stats.channel = 'ASI'
+    #         if len(tr) > 2:
+    #             tr.data = np.diff(tr.data)
+    #         else:
+    #             read_stream.remove(tr)
+    #
+    #     channel = original_channel
+
+    # print(read_stream)
+    plot_overview_from_stream(
+      read_stream,
+      channel=channel,
+      stations=stations,
+      ylim=ylim,
+      ylim_masking=ylim_masking,
+      start_time=start_time,
+      end_time=end_time,
+      plot_solar_presence=plot_solar_presence,
+      solar_presence_dir=solar_presence_dir,
+      # plot_time_delays=plot_time_delays,
+      # time_delays_dir=time_delays_dir,
+      merge_locations=merge_locations,
+      save_pdf=save_pdf,
+      outfile=outfile)
 
 # # used 17 October
 # def stream_from_directory(
@@ -824,7 +851,8 @@ def stream_from_directory_new(
     # and return a stream
 
     if end_time is None:
-        end_time = start_time + timedelta(hours=3)
+        # as a default, retrieve the whole day 
+        end_time = start_time + timedelta(hours=24)
 
     time_interval = timedelta(hours=24)
 
@@ -845,11 +873,15 @@ def stream_from_directory_new(
 
 
                     stream = read(filename)
-                    stream.trim(starttime=start_time, endtime=end_time)
+                    # stream.trim(starttime=start_time, endtime=end_time)
 
                     if merge_locations:
                         for tr in stream:
                             tr.stats.location = ''
+
+                        # print('temporary measure !!!')    
+                        # for tr in stream:
+                        #     tr.stats.delta = DELTA*4
 
                     return_stream += stream
 
@@ -860,6 +892,11 @@ def stream_from_directory_new(
 
         # increment the time interval
         start += time_interval
+
+    print(return_stream)
+    for tr in return_stream:
+        print(tr.stats.sampling_rate, tr.stats.delta)
+
     return_stream.merge()
     return_stream = return_stream.sort(keys=['channel'])
 
@@ -917,8 +954,8 @@ def save_availability_coarse(
 
     time_interval = timedelta(hours=24)
 
-    stations = [sta.lower() for sta in stations]
-    channels = [cha.lower() for cha in channels]
+    # stations = [sta.lower() for sta in stations]
+    # channels = [cha.lower() for cha in channels]
 
     segs = []
 
@@ -929,10 +966,8 @@ def save_availability_coarse(
         # year = start.year
         # julday = start.julday
 
-# XXXX
-
-        filename = find_filename_date_lower('*', '*', '*', start)
-        directory = find_dir_lower(file_dir,'*',start)
+        filename = find_filename_date_upper('*', '*', '*', start)
+        directory = find_dir_upper(file_dir,'*',start)
         filename = os.path.join(directory,filename)
 
         if read_gzip:
@@ -1015,8 +1050,6 @@ def save_availability(
 
         # year = start.year
         # julday = start.julday
-
-# XXXX
 
         filename = find_filename_date_lower('*', '*', '*', start)
         directory = find_dir_lower(file_dir,'*',start)
@@ -1134,7 +1167,7 @@ def save_availability(
 #                     # year = start.year
 #                     # julday = start.julday
 # 
-#         # XXXX
+
 # 
 #                     filename = find_filename_date_lower(station, location, channel, start)
 #                     # print(' this is what I look for ', filename)
@@ -1194,10 +1227,10 @@ def save_availability(
 #                         tr.data = np.ma.masked_where(tr.data == -1, tr.data)
 #                         # print('tr data end')
 #                         # print(tr.data[0:90])
-#                         # # exit()
+
 #                     stream.print_gaps()
 #                     # 
-#                     # exit()
+
 # 
 #                     # need to check that actual gaps are recorded 
 #                     stream = stream.split()
@@ -1442,68 +1475,68 @@ def plot_availability(
 
     an_fs = 11
 
-    plt.annotate(xy=(1.01,1/ylim_max), text='SHZ', fontsize=an_fs,
+    plt.annotate(xy=(1.01,1/ylim_max), s='SHZ', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,2/ylim_max), text='MH2', fontsize=an_fs,
+    plt.annotate(xy=(1.01,2/ylim_max), s='MH2', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,3/ylim_max), text='MH1', fontsize=an_fs,
+    plt.annotate(xy=(1.01,3/ylim_max), s='MH1', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,4/ylim_max), text='MHZ', fontsize=an_fs,
-      xycoords="axes fraction", horizontalalignment='left',
-      verticalalignment='center')
-
-    plt.annotate(xy=(1.01,6/ylim_max), text='SHZ', fontsize=an_fs,
-      xycoords="axes fraction", horizontalalignment='left',
-      verticalalignment='center')
-    plt.annotate(xy=(1.01,7/ylim_max), text='MH2', fontsize=an_fs,
-      xycoords="axes fraction", horizontalalignment='left',
-      verticalalignment='center')
-    plt.annotate(xy=(1.01,8/ylim_max), text='MH1', fontsize=an_fs,
-      xycoords="axes fraction", horizontalalignment='left',
-      verticalalignment='center')
-    plt.annotate(xy=(1.01,9/ylim_max), text='MHZ', fontsize=an_fs,
+    plt.annotate(xy=(1.01,4/ylim_max), s='MHZ', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
 
-    plt.annotate(xy=(1.01,11/ylim_max), text='SHZ', fontsize=an_fs,
+    plt.annotate(xy=(1.01,6/ylim_max), s='SHZ', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,12/ylim_max), text='MH2', fontsize=an_fs,
+    plt.annotate(xy=(1.01,7/ylim_max), s='MH2', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,13/ylim_max), text='MH1', fontsize=an_fs,
+    plt.annotate(xy=(1.01,8/ylim_max), s='MH1', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,14/ylim_max), text='MHZ', fontsize=an_fs,
-      xycoords="axes fraction", horizontalalignment='left',
-      verticalalignment='center')
-
-    plt.annotate(xy=(1.01,16/ylim_max), text='SHZ', fontsize=an_fs,
-      xycoords="axes fraction", horizontalalignment='left',
-      verticalalignment='center')
-    plt.annotate(xy=(1.01,17/ylim_max), text='MH2', fontsize=an_fs,
-      xycoords="axes fraction", horizontalalignment='left',
-      verticalalignment='center')
-    plt.annotate(xy=(1.01,18/ylim_max), text='MH1', fontsize=an_fs,
-      xycoords="axes fraction", horizontalalignment='left',
-      verticalalignment='center')
-    plt.annotate(xy=(1.01,19/ylim_max), text='MHZ', fontsize=an_fs,
+    plt.annotate(xy=(1.01,9/ylim_max), s='MHZ', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
 
-    plt.annotate(xy=(1.01,21/ylim_max), text='SHZ', fontsize=an_fs,
+    plt.annotate(xy=(1.01,11/ylim_max), s='SHZ', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,22/ylim_max), text='MH2', fontsize=an_fs,
+    plt.annotate(xy=(1.01,12/ylim_max), s='MH2', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,23/ylim_max), text='MH1', fontsize=an_fs,
+    plt.annotate(xy=(1.01,13/ylim_max), s='MH1', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
-    plt.annotate(xy=(1.01,24/ylim_max), text='MHZ', fontsize=an_fs,
+    plt.annotate(xy=(1.01,14/ylim_max), s='MHZ', fontsize=an_fs,
+      xycoords="axes fraction", horizontalalignment='left',
+      verticalalignment='center')
+
+    plt.annotate(xy=(1.01,16/ylim_max), s='SHZ', fontsize=an_fs,
+      xycoords="axes fraction", horizontalalignment='left',
+      verticalalignment='center')
+    plt.annotate(xy=(1.01,17/ylim_max), s='MH2', fontsize=an_fs,
+      xycoords="axes fraction", horizontalalignment='left',
+      verticalalignment='center')
+    plt.annotate(xy=(1.01,18/ylim_max), s='MH1', fontsize=an_fs,
+      xycoords="axes fraction", horizontalalignment='left',
+      verticalalignment='center')
+    plt.annotate(xy=(1.01,19/ylim_max), s='MHZ', fontsize=an_fs,
+      xycoords="axes fraction", horizontalalignment='left',
+      verticalalignment='center')
+
+    plt.annotate(xy=(1.01,21/ylim_max), s='SHZ', fontsize=an_fs,
+      xycoords="axes fraction", horizontalalignment='left',
+      verticalalignment='center')
+    plt.annotate(xy=(1.01,22/ylim_max), s='MH2', fontsize=an_fs,
+      xycoords="axes fraction", horizontalalignment='left',
+      verticalalignment='center')
+    plt.annotate(xy=(1.01,23/ylim_max), s='MH1', fontsize=an_fs,
+      xycoords="axes fraction", horizontalalignment='left',
+      verticalalignment='center')
+    plt.annotate(xy=(1.01,24/ylim_max), s='MHZ', fontsize=an_fs,
       xycoords="axes fraction", horizontalalignment='left',
       verticalalignment='center')
 
@@ -1536,115 +1569,188 @@ def plot_availability(
         plt.show()
 
 
-# 
-# # used 2 November
-# def calc_average_sampling_interval(
-#     stations=['S11','S12','S14','S15','S16'],
-#     file_dir='.',
-#     av_dir='.',
-#     start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
-#     end_time=UTCDateTime('1977-09-30T21:00:00.000000Z'),
-#     read_gzip=True,
-#     write_gzip=True,
-#     sampling_average=360,
-#     # calc_moving_average=True
-#     ):
-#     '''
-#     Calculates the average framecounts and saves as new files.
-#     '''
-# 
-#     time_interval = timedelta(hours=24)
-# 
-#     # return_stream = Stream()
-# 
-#     # check that the overall directory exists
-#     if not os.path.exists(av_dir):
-#         msg = ("The directory {} doesn't exist".format(av_dir))
-#         raise IOError(msg)
-# 
-#     start = start_time
-#     while start < end_time:
-#         for station in stations:
-#             # Note that location 00 is missing
-#             for location in np.arange(1,14):
-#                 location = "%02d" % (location,)
-#                 filename = find_filename_date(station, location, 'ATT', start)
-#                 if read_gzip:
-#                     filename = "{}.gz".format(filename)
-#                 directory = find_dir(file_dir,start.year,station,'ATT')
-# 
-#                 filename = os.path.join(directory, filename)
-# 
-#                 # check that the file pattern exists
-#                 if not glob.glob(filename):
-#                     msg = 'view.py cannot find file: {}'.format(filename)
-#                     # print(msg)
-#                     logging.info(msg)
-#                     continue
-# 
-#                 stream = read(filename)
-#                 stream.merge()
-# 
-#                 stream = stream.sort(keys=['starttime'])
-# 
-#                 for i, tr in enumerate(stream):
-#                     # slice the array with a step of the sampling_average
-#                     # e.g. if sampling_average is the same as the
-#                     # samples in a frame (360) then every 360th point
-#                     # this gives a timestamp at the beginning of each frame
-#                     tr.data = tr.data[0::sampling_average]
-#                     # it is only valid to 3 decimal places
-#                     tr.data = np.ma.round(tr.data,3)
-#                     # diff function to calculate consecutive values
-#                     # note that we now have one value fewer than we did before
-#                     tr.data = np.diff(tr.data)
-# 
-#                     if tr.stats.npts > 0:
-#                         tr.data = np.ma.round(tr.data,3)
-# 
-#                         tr.data = tr.data / sampling_average
-# 
-#                         # if calc_moving_average:
-#                         #     tr.data = moving_average(tr.data)
-# 
-#                         # # if any of the values are zero, make a masked trace
-#                         # if 0 in tr.data:
-#                         #     tr.data = ma.masked_equal(tr.data, 0)
-# 
-#                         # correct the starttime - half the sampling_average for the averaging,
-#                         tr.stats.starttime = tr.stats.starttime + (sampling_average/2)*DELTA
-#                         tr.stats.delta = DELTA * sampling_average
-#                         tr.stats.mseed.encoding = 'FLOAT64'
-#                         tr.stats.channel = 'ASI'
-# 
-#                         if tr.stats.npts < 1:
-#                             stream.remove(tr)
-#                         elif isinstance(tr.data,np.ma.MaskedArray) and tr.data.count() < 1:
-#                             stream.remove(tr)
-# 
-#                     else:
-#                         stream.remove(tr)
-# 
-#                     if len(stream) > 0:
-# 
-#                         av_filename = find_filename_date(station, location, 'ASI', start)
-# 
-#                         # make the subdirectory with the station name
-#                         av_directory = make_dir(av_dir,start.year,station,'ASI')
-#                         av_filename = os.path.join(av_directory, av_filename)
-# 
-# # /Users/nunn/lunar_data/PDART_ELAPSED_TIME/1973/S12/ASI/S12.XA..ASI.1973.360.gz
-# 
-#                         # save
-#                         stream = stream.split()
-#                         stream.write(av_filename, 'MSEED')
-# 
-#                         av_filename_gzip = '%s.gz' % (av_filename)
-#                         # # this is slow
-#                         if write_gzip:
-#                             with open(av_filename, 'rb') as f_in, gzip.open(av_filename_gzip, 'wb') as f_out:
-#                                 shutil.copyfileobj(f_in, f_out)
-#                             os.unlink(av_filename)
-# 
-#         # increment the time interval
-#         start += time_interval
+
+
+def calc_average_sampling_interval(
+    stations=['S11','S12','S14','S15','S16'],
+    top_level_dir='.',
+    av_dir='.',
+    start_time=UTCDateTime('1969-07-21T03:00:00.000000Z'),
+    end_time=UTCDateTime('1977-09-30T21:00:00.000000Z'),
+    read_gzip=True,
+    write_gzip=True,
+    sampling_average=360,
+    # calc_moving_average=True
+    ):
+    '''
+    Calculates the average framecounts and saves as new files.
+    '''
+
+    time_interval = timedelta(hours=24)
+
+    # return_stream = Stream()
+
+    # check that the overall directory exists
+    if not os.path.exists(av_dir):
+        msg = ("The directory {} doesn't exist".format(av_dir))
+        raise IOError(msg)
+
+    start = start_time
+    while start < end_time:
+        for station in stations:
+            # # Note that location 00 is missing
+            # for location in np.arange(1,14):
+            #     location = "%02d" % (location,)
+            #     filename = find_filename_date(station, location, 'ATT', start)
+            #     if read_gzip:
+            #         filename = "{}.gz".format(filename)
+            #     directory = find_dir(file_dir,start.year,station,'ATT')
+            # 
+            #     filename = os.path.join(directory, filename)
+            # 
+            # 
+            # 
+            #     # check that the file pattern exists
+            #     if not glob.glob(filename):
+            #         msg = 'view.py cannot find file: {}'.format(filename)
+            #         # print(msg)
+            #         logging.info(msg)
+            #         continue
+            # 
+            #     stream = read(filename)
+            stream = stream_from_directory_new(
+                top_level_dir=top_level_dir,
+                start_time=start,
+                stations=[station],
+                channels=['ATT'],
+                merge_locations=False,
+                end_time=None)
+
+
+            # print('temporary measure !!!')    
+            # for tr in stream:
+            #     print('before')
+            #     print(tr.stats)
+            #     tr.stats.delta = 0.6036
+            #     print(tr.stats)
+            #     print('end')      
+            
+
+            stream.merge()
+            # print(len(stream))
+            # 
+            # print(stream)
+            # exit()
+
+            stream = stream.sort(keys=['starttime'])
+
+            remove_negative_ones(stream)
+            
+
+            for i, tr in enumerate(stream):
+                # slice the array with a step of the sampling_average
+                # e.g. if sampling_average is the same as the
+                # samples in a frame (360) then every 360th point
+                # this gives a timestamp at the beginning of each frame
+
+                # print(tr.stats)
+                # 
+                # for a in range(-10,0):
+                #     print(UTCDateTime(tr.data[a]))
+                # 
+
+                # tr.plot(method='full')
+                
+                tr.data = tr.data[0::sampling_average]
+
+
+                # it is only valid to 3 decimal places
+                # tr.data = np.ma.round(tr.data,3)
+                # diff function to calculate consecutive values
+                # note that we now have one value fewer than we did before
+                # print(tr.data[-1])
+
+                if np.ma.isMaskedArray(tr.data):
+
+                    # print('yes masked')
+                    tr.data = np.ma.diff(tr.data)
+                    # tr.plot(method='full')
+                else: 
+                    tr.data = np.diff(tr.data)
+
+
+                if tr.stats.npts > 0:
+                    tr.data = np.ma.round(tr.data,3)
+
+                    tr.data = tr.data / sampling_average
+
+                    # if calc_moving_average:
+                    #     tr.data = moving_average(tr.data)
+
+                    # # if any of the values are zero, make a masked trace
+                    # if 0 in tr.data:
+                    #     tr.data = ma.masked_equal(tr.data, 0)
+
+                    # correct the starttime - half the sampling_average for the averaging,
+                    tr.stats.starttime = tr.stats.starttime + (sampling_average/2)*DELTA*4
+                    # print('delta ', tr.stats.delta)
+                    # print(DELTA)
+                    tr.stats.delta = DELTA*4 * sampling_average
+                    tr.stats.mseed.encoding = 'FLOAT64'
+                    tr.stats.channel = 'ASI'
+
+                    if tr.stats.npts < 1:
+                        stream.remove(tr)
+                    elif isinstance(tr.data,np.ma.MaskedArray) and tr.data.count() < 1:
+                        stream.remove(tr)
+
+                else:
+                    stream.remove(tr)
+
+                for tr in stream:
+                    if np.ma.isMaskedArray(tr.data):
+                        # mask the ASI trace which has gaps with a fill value
+                        tr.data = tr.data.filled(fill_value=INVALID_99)
+
+                # XXXX
+
+                for tr in stream: 
+                    # print('what do I have now? - should be one day, one station')
+                    # print(stream)
+                    # stream.plot()
+                    location = tr.stats.location
+
+                    av_filename = find_filename_date_upper(station, location, 'ASI', start)
+                    
+
+                    # make the subdirectory with the station name
+                    # av_directory = make_dir(av_dir,start.year,station,'ASI')
+                    av_directory = make_dir(av_dir,station,start,lower=False)
+                    av_filename = os.path.join(av_directory, av_filename)
+
+# /Users/nunn/lunar_data/PDART_ELAPSED_TIME/1973/S12/ASI/S12.XA..ASI.1973.360.gz
+
+
+                    
+                    # save
+                    # stream = stream.split()
+
+
+                    tr.write(av_filename, 'MSEED')
+                    print(tr)
+                    print(av_filename)
+                    
+
+
+                    av_filename_gzip = '%s.gz' % (av_filename)
+                    # # this is slow
+                    if write_gzip:
+                        with open(av_filename, 'rb') as f_in, gzip.open(av_filename_gzip, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                        os.unlink(av_filename)
+                        print('writing file ', av_filename)
+
+                
+
+        # increment the time interval
+        start += time_interval
