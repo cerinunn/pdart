@@ -325,9 +325,9 @@ def make_seed_xml(output_dir,seed_basename,release_number,seed_col):
       xmlns:apollo="http://pds.nasa.gov/pds4/mission/apollo/v1"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://pds.nasa.gov/pds4/pds/v1
-      https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.xsd
+      https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1I00.xsd
       http://pds.nasa.gov/pds4/mission/apollo/v1
-      https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1G00_1000.xsd">
+      https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1I00_1000.xsd">
 '''
     pattern = '<Product_Native.*'
     xml_data = re.sub(pattern, repl, xml_data, count=0, flags=0)
@@ -423,9 +423,9 @@ def make_dataless_xml(output_dir,dataless_basename,release_number,dataless_col):
       xmlns:apollo="http://pds.nasa.gov/pds4/mission/apollo/v1"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://pds.nasa.gov/pds4/pds/v1
-      https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.xsd
+      https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1I00.xsd
       http://pds.nasa.gov/pds4/mission/apollo/v1
-      https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1G00_1000.xsd">
+      https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1I00_1000.xsd">
 '''
 
     pattern = '<Product_Native.*'
@@ -535,9 +535,9 @@ def make_stationxml_xml(output_dir,stationxml_basename,release_number,stationxml
       xmlns:apollo="http://pds.nasa.gov/pds4/mission/apollo/v1"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://pds.nasa.gov/pds4/pds/v1
-      https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.xsd
+      https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1I00.xsd
       http://pds.nasa.gov/pds4/mission/apollo/v1
-      https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1G00_1000.xsd">
+      https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1I00_1000.xsd">
 '''
 
     # XXXX
@@ -859,9 +859,9 @@ def make_geocsv_xml(output_dir,csv_basename,release_number,geocsv_col):
         xmlns:apollo="http://pds.nasa.gov/pds4/mission/apollo/v1"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://pds.nasa.gov/pds4/pds/v1
-        https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.xsd
+        https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1I00.xsd
         http://pds.nasa.gov/pds4/mission/apollo/v1
-        https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1G00_1000.xsd">
+        https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1I00_1000.xsd">
 '''
     pattern = '<Product_Observational.*'
     xml_data = re.sub(pattern, repl, xml_data, count=0, flags=0)

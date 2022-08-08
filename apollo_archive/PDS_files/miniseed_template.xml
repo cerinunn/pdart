@@ -1,24 +1,24 @@
 <?xml version='1.0' encoding='utf-8'?>
 <?xml-model 
-    href="https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.sch"
+    href="https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1I00.sch"
     schematypens="http://purl.oclc.org/dsdl/schematron"?>
 <?xml-model 
-    href="https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1G00_1000.sch"
+    href="https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1I00_1000.sch"
     schematypens="http://purl.oclc.org/dsdl/schematron"?>
 <Product_Native
   xmlns="http://pds.nasa.gov/pds4/pds/v1"
   xmlns:apollo="http://pds.nasa.gov/pds4/mission/apollo/v1"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://pds.nasa.gov/pds4/pds/v1
-  https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1G00.xsd
+  https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1I00.xsd
   http://pds.nasa.gov/pds4/mission/apollo/v1
-  https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1G00_1000.xsd">
+  https://pds.nasa.gov/pds4/mission/apollo/v1/PDS4_APOLLO_1I00_1000.xsd">
 
   <Identification_Area>
     <logical_identifier>urn:nasa:pds:apollo_pse:data_seed:xa.s16.01.afr.1976.066.1</logical_identifier>
     <version_id>1.0</version_id>
     <title>Apollo Passive Seismic Experiment data in MiniSEED format</title>
-    <information_model_version>1.16.0.0</information_model_version>
+    <information_model_version>1.18.0.0</information_model_version>
     <product_class>Product_Native</product_class>
     <Modification_History>
       <Modification_Detail>
