@@ -18,13 +18,22 @@
         The Apollo dictionary contains classes that describe aspects of the 
         Apollo missions and related instruments.
         
+        10/15/21 SHS
+        - Changed definition of Internal_Reference in Metadata_Location, SEED_Equivalent, and ASCII_Equivalent classes,
+        using DD_Association instead of DD_Associate_External_Class. Added rules to validate the reference_type.
+        This is a workaround recommended by Anne Raugh, Small Bodies Node, because LDDTool is currently not
+        correctly handling DD_Associate_External_Class. The original definitions are commented out, and may
+        be restored if LDDTool is revised appropriately.
+        
+        08/05/2022 GEO/JGW Rebuilt with 1I00 IM
+
         Apollo version 1.0.0.0
-        PDS Build 1.16.0.0 (1G00)
-        LDDTool version 13.0.2
+        PDS Build 1.18.0.0 (1I00)
+        LDDTool version 14.0.13
         
         Built with lddtool -plJ PDS4_Apollo_IngestLDD.xml 
     </comment>
-    <last_modification_date_time>2021-10-13T00:00</last_modification_date_time>
+    <last_modification_date_time>2022-08-05T10:43:50</last_modification_date_time>
 
     <!-- Apollo Mission Dictionary Attributes -->
     <!-- Definitions of attributes of these Apollo-specific classes: 
@@ -40,6 +49,7 @@
 	     product_type
 	    
 	    In Seismic_Parameters
+	     ASCII_Equivalent
 	     channel
 	     location
 	     Metadata_Location
@@ -63,6 +73,7 @@
     -->
     
     <!-- Begin attribute Definitions for the Observation_Information class -->
+    
     <DD_Attribute>
     <name>product_type</name>
     <version_id>1.0</version_id>
@@ -94,6 +105,7 @@
       </DD_Permissible_Value>
     </DD_Value_Domain>
     </DD_Attribute>
+    
     <!-- End attribute Definitions for the Observation_Information class -->  
   
     <!-- Begin definitions for attributes of the SEISMIC_Parameters class and subclasses -->  
@@ -145,7 +157,7 @@
             </DD_Permissible_Value>
             <DD_Permissible_Value>
                 <value>SHZ</value>
-                <value_meaning>Vertical Component of the short-period instrument</value_meaning>
+                <value_meaning>Vertical Component of the short-period instrument.</value_meaning>
             </DD_Permissible_Value>
         </DD_Value_Domain>
     </DD_Attribute>
@@ -154,7 +166,7 @@
         <name>location</name>
         <version_id>1.0</version_id>
         <local_identifier>apollo.location</local_identifier>
-        <nillable_flag>true</nillable_flag>
+        <nillable_flag>false</nillable_flag>
         <submitter_name>Jennifer Ward</submitter_name>
         <definition>
             Apollo PSE location. 
@@ -164,11 +176,11 @@
             <value_data_type>ASCII_Short_String_Collapsed</value_data_type>
             <DD_Permissible_Value>
                 <value>00</value>
-                <value_meaning>Peaked response of the mid-period seismometer</value_meaning>
+                <value_meaning>Peaked response of the mid-period seismometer.</value_meaning>
             </DD_Permissible_Value>
             <DD_Permissible_Value>
                 <value>01</value>
-                <value_meaning>Flat response of the mid-period seismometer</value_meaning>
+                <value_meaning>Flat response of the mid-period seismometer.</value_meaning>
             </DD_Permissible_Value>
         </DD_Value_Domain>
     </DD_Attribute>
@@ -238,7 +250,7 @@
         <definition>Sampling_rate represents the number of samples per second.
             The sampling rate is nominal, and there is a small variation
             between the nominal sampling rate and the actual sampling rate, 
-            which can be estimated using the timing trace ATT.
+            which can be estimated using the timing trace ATT. 
         </definition>
         <DD_Value_Domain>
             <enumeration_flag>false</enumeration_flag>
@@ -341,7 +353,7 @@
             <minimum_occurrences>1</minimum_occurrences>
             <maximum_occurrences>1</maximum_occurrences>
         </DD_Association>
-        <DD_Associate_External_Class>
+<!--    <DD_Associate_External_Class>
             <namespace_id>pds</namespace_id>
             <class_name>Internal_Reference</class_name>
             <minimum_occurrences>1</minimum_occurrences>
@@ -358,6 +370,14 @@
                 </DD_Permissible_Value>
             </DD_Context_Value_List>
         </DD_Associate_External_Class>
+-->
+        <!-- LID or LIDVID of metadata product associated with this data product-->
+        <DD_Association>
+            <identifier_reference>pds.Internal_Reference</identifier_reference>
+            <reference_type>component_of</reference_type>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
     </DD_Class>
     <!-- End of Metadata_Location Class Definition -->
     
@@ -380,7 +400,7 @@
             <minimum_occurrences>1</minimum_occurrences>
             <maximum_occurrences>1</maximum_occurrences>
         </DD_Association>
-        <DD_Associate_External_Class>
+<!--    <DD_Associate_External_Class>
             <namespace_id>pds</namespace_id>
             <class_name>Internal_Reference</class_name>
             <minimum_occurrences>1</minimum_occurrences>
@@ -397,6 +417,16 @@
                 </DD_Permissible_Value>
             </DD_Context_Value_List>
         </DD_Associate_External_Class>
+-->
+        <!-- LID or LIDVID of the Apollo PSE data product in ASCII format
+             that is the equivalent of this Apollo PSE data product in SEED format-->
+        <DD_Association>
+            <identifier_reference>pds.Internal_Reference</identifier_reference>
+            <reference_type>component_of</reference_type>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+
     </DD_Class>
     <!-- End of ASCII_Equivalent Class Definition -->
     
@@ -419,7 +449,7 @@
             <minimum_occurrences>1</minimum_occurrences>
             <maximum_occurrences>1</maximum_occurrences>
         </DD_Association>
-        <DD_Associate_External_Class>
+<!--    <DD_Associate_External_Class>
             <namespace_id>pds</namespace_id>
             <class_name>Internal_Reference</class_name>
             <minimum_occurrences>1</minimum_occurrences>
@@ -436,6 +466,16 @@
                 </DD_Permissible_Value>
             </DD_Context_Value_List>
         </DD_Associate_External_Class>
+-->
+        <!-- LID or LIDVID of the Apollo PSE data product in SEED format
+             that is the equivalent of this Apollo PSE data product in ASCII format. -->
+        <DD_Association>
+            <identifier_reference>pds.Internal_Reference</identifier_reference>
+            <reference_type>component_of</reference_type>
+            <minimum_occurrences>1</minimum_occurrences>
+            <maximum_occurrences>1</maximum_occurrences>
+        </DD_Association>
+        
     </DD_Class>
     <!-- End of SEED_Equivalent Class Definition -->
     
@@ -509,5 +549,45 @@
     <!-- End of Seismic_Parameters Class definition -->
     
     <!-- End of class definitions -->
+    
+    <!-- Begin definitions of Apollo LDD rules -->
+    
+    <!-- RULES ABOUT METADATA LOCATION -->
+    <DD_Rule>
+        <local_identifier>apollo_metadata_location_rule_0</local_identifier>
+        <rule_context>apollo:Metadata_Location/pds:Internal_Reference</rule_context>
+        <DD_Rule_Statement>
+            <rule_type>Assert</rule_type>
+            <rule_test>pds:reference_type = ('data_to_metadata')</rule_test>
+            <rule_message>apollo_metadata_location_rule_0: In the
+                Metadata_Location/Internal_Reference class, the value of the reference_type
+                attribute must be equal to "data_to_metadata".</rule_message>
+        </DD_Rule_Statement>
+    </DD_Rule>
         
+    <!-- RULES ABOUT ASCII_Equivalent and SEED_Equivalent Products -->
+    <DD_Rule>
+        <local_identifier>apollo_ascii_equivalent_rule_0</local_identifier>
+        <rule_context>apollo:ASCII_Equivalent/pds:Internal_Reference</rule_context>
+        <DD_Rule_Statement>
+            <rule_type>Assert</rule_type>
+            <rule_test>pds:reference_type = ('seed_to_ascii')</rule_test>
+            <rule_message>apollo_ascii_equivalent_rule_0: In the
+                ASCII_Equivalent/Internal_Reference class, the value of the reference_type
+                attribute must be equal to "seed_to_ascii".</rule_message>
+        </DD_Rule_Statement>
+    </DD_Rule>
+    <DD_Rule>
+        <local_identifier>apollo_seed_equivalent_rule_0</local_identifier>
+        <rule_context>apollo:SEED_Equivalent/pds:Internal_Reference</rule_context>
+        <DD_Rule_Statement>
+            <rule_type>Assert</rule_type>
+            <rule_test>pds:reference_type = ('ascii_to_seed')</rule_test>
+            <rule_message>apollo_seed_equivalent_rule_0: In the
+                SEED_Equivalent/Internal_Reference class, the value of the reference_type
+                attribute must be equal to "ascii_to_seed".</rule_message>
+        </DD_Rule_Statement>
+    </DD_Rule>
+    
+    
 </Ingest_LDD>
