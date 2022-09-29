@@ -844,7 +844,7 @@ def stream_from_directory_new(
     start_time,
     stations,
     channels,
-    merge_locations=True,
+    merge_locations=False,
     end_time=None):
 
     # helper method to read files from the directory
@@ -899,6 +899,8 @@ def stream_from_directory_new(
 
     return_stream.merge()
     return_stream = return_stream.sort(keys=['channel'])
+
+    return_stream.trim(starttime=start_time,endtime=end_time)
 
     return return_stream
 
