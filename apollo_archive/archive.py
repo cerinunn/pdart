@@ -17,19 +17,44 @@ Build the Apollo data archive for the PDS
     # java -jar /Users/cnunn/Applications/stationxml-seed-converter-2.1.0.jar --input stationxml.xa.0.sxml --output dataless.xa.0.seed
 
 
-
     # make sure the release number is correct 
+
     # run each section of archive()
+
+    # I had to run it station by station and then zip the results 
 
     cd  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/
 
-    cat  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory_stationxml.csv.tmp  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.tmp > collection_data_table_inventory.csv
+    grep s11 collection_data_table_inventory.csv | wc
+    grep s11 collection_data_seed_inventory.csv | wc
 
-    cat  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory_dataless.csv.tmp  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory.csv.tmp > collection_data_seed_inventory.csv
+    grep s12 collection_data_table_inventory.csv | wc
+    grep s12 collection_data_seed_inventory.csv | wc
+
+    grep s14 collection_data_table_inventory.csv | wc
+    grep s14 collection_data_seed_inventory.csv | wc
+
+    grep s15 collection_data_table_inventory.csv | wc
+    grep s15 collection_data_seed_inventory.csv | wc
+
+    grep s16 collection_data_table_inventory.csv | wc
+    grep s16 collection_data_seed_inventory.csv | wc
+
+    grep s11  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory_stationxml.csv.tmp  | wc 
+    grep s11 /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s11.tmp | wc 
+    grep s11 /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s12.tmp | wc 
+    grep s11 /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s14.tmp  | wc 
+    grep s11 /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s15.tmp  | wc 
+    grep s11 /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s16.tmp  | wc 
+
+
+    cat  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory_stationxml.csv.tmp  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s11.tmp /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s12.tmp /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s14.tmp /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s15.tmp /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_table_inventory.csv.s16.tmp > collection_data_table_inventory.csv
+
+    cat  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory_dataless.csv.tmp  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory.csv.s11.tmp /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory.csv.s12.tmp /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory.csv.s14.tmp /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory.csv.s15.tmp /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/collection_data_seed_inventory.csv.s16.tmp > collection_data_seed_inventory.csv
 
     check numbers for collection xml files 
 
-    /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_prep/data
+    cd /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/data/
 
     find . -name "*.mseed" | wc
     find . -name "*.xml" ! -name "*a.xml" ! -name "dataless*" ! -name "station*" ! -name "collection*" ! -name "seis_release_note*" | wc
@@ -49,7 +74,6 @@ Build the Apollo data archive for the PDS
     get the number of records with:
     wc collection_data_seed_inventory.csv
     wc collection_data_table_inventory.csv
-    wc  collection_data_lander_inventory.csv
 
 
     cd  /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/
@@ -74,15 +98,12 @@ Build the Apollo data archive for the PDS
     # make_metadata(input_metadata,metadata_file)
     # input_metadata = '/Users/cnunn/lunar_data/PDART_METADATA/XA.1969-1977.0.xml'
     # metadata_file = '/Users/cnunn/python_packages/apollo_archive/files/metadata.XA.1969-1977.0.csv'
+
+    Note that this requires mseed2ascii code. See note below. 
+
+
+
     '''
-
-
-
-Note that this requires mseed2ascii code. See note below. 
-
-
-
-'''
 
 
 from lxml import etree
@@ -967,33 +988,39 @@ def archive(release_number):
     logging.info(log_text)
     print(log_text)
 
-    print('make_dataless_labels')
-    make_dataless_labels(release_number)
-    
-    print('make_stationxml_labels')
-    make_stationxml_labels(release_number)
+    station1 = None
+    station1 = 's16'
+    # print('make_dataless_labels')
+    # make_dataless_labels(release_number)
+    # 
+    # print('make_stationxml_labels')
+    # make_stationxml_labels(release_number)
     
     print('copy_seed_files')
-    copy_seed_files(release_number)
+    copy_seed_files(release_number,station1)
 
     print('make_seed_labels')
-    make_seed_labels(release_number)
-
+    make_seed_labels(release_number,station1)
+    
     print('make_geocsv_files')
-    make_geocsv_files(release_number)
-
+    make_geocsv_files(release_number,station1)
+    
     print('make_geocsv_labels')
-    make_geocsv_labels(release_number)
+    make_geocsv_labels(release_number,station1)
 
     log_text = 'End: ', datetime.now()
     logging.info(log_text)
     print(log_text)
 
-def make_geocsv_labels(release_number):
+def make_geocsv_labels(release_number,station1):
 
     # start empty geocsv collection  
     geocsv_col = OrderedDict()
 
+    if station1 is None: 
+        file_wildcard = '*.a.csv'
+    else:
+        file_wildcard = '*{}*.a.csv'.format(station1)
 
     for (geocsv_filepath, geocsv_basename) in find_files(OUTPUT_DIR, '*.a.csv'):
     # for (geocsv_filepath, geocsv_basename) in find_files(OUTPUT_DIR, 'xa.s12..att.1976.061.0.a.csv'):
@@ -1027,12 +1054,12 @@ def make_geocsv_labels(release_number):
             # test a single file
             break
 
-    write_collection_geocsv_file(geocsv_col)
+    write_collection_geocsv_file(geocsv_col,station1)
 
 
 
 
-def make_geocsv_files(release_number):
+def make_geocsv_files(release_number,station1):
     '''
     Make the geocsv files using mseed2ascii. 
 
@@ -1079,7 +1106,12 @@ def make_geocsv_files(release_number):
 
     '''
 
-    for (seed_filepath, seed_basename) in find_files(OUTPUT_DIR, '*.mseed'):
+    if station1 is None:
+        file_wildcard = '*.mseed'
+    else:
+        file_wildcard = '*{}*.mseed'.format(station1)   
+
+    for (seed_filepath, seed_basename) in find_files(OUTPUT_DIR, file_wildcard):
     # for (seed_filepath, seed_basename) in find_files(OUTPUT_DIR, '*.mseed'):
         print(seed_filepath, seed_basename)
         # seed_basename = 'xb.elyse.02.bhw.2019.307.7.mseed'
@@ -1259,12 +1291,17 @@ def make_stationxml_labels(release_number):
 
 
 
-def make_seed_labels(release_number):
+def make_seed_labels(release_number,station1):
 
     # start empty seed collection
     seed_col = OrderedDict()
 
-    for (seed_filepath, seed_basename) in find_files(OUTPUT_DIR, '*.mseed'):
+    if station1 is None:
+        file_wildcard = '*.mseed'
+    else:
+        file_wildcard = '*{}*.mseed'.format(station1)
+
+    for (seed_filepath, seed_basename) in find_files(OUTPUT_DIR, file_wildcard):
         print(seed_filepath, seed_basename)
 
         seed_filename = os.path.join(seed_filepath, seed_basename)
@@ -1293,7 +1330,7 @@ def make_seed_labels(release_number):
             break
 
 
-    write_collection_seed_file(seed_col)
+    write_collection_seed_file(seed_col,station1)
 
 
         
@@ -1327,15 +1364,15 @@ def make_seed_labels(release_number):
 
 
 
-def copy_seed_files(release_number):
-    
+def copy_seed_files(release_number,station1):
 
     # for (input_filepath, input_basename) in find_initial_files(INPUT_DIR, '*S11*1969.202.*.MSEED', case='upper'):
     # for (input_filepath, input_basename) in find_initial_files(INPUT_DIR, '*1976.070*.MSEED', case='upper'):
-    for (input_filepath, input_basename) in find_initial_files(INPUT_DIR, '*.MSEED', case='upper'):
+
+    for (input_filepath, input_basename) in find_initial_files(INPUT_DIR, '*.MSEED', case='upper',station1=station1):
+    
 
         input_filename = os.path.join(input_filepath, input_basename)
-        print(input_filename)
 
         path_list = input_filepath.split(os.sep)
 
@@ -1410,16 +1447,26 @@ def update_collection_stationxml_file(stationxml_col,network,rev,version_id):
     return stationxml_col
 
 
-def write_collection_seed_file(seed_col):
-    with open(os.path.join(PREP_DIR, 'collection_data_seed_inventory.csv.tmp'),'w', newline='\r\n') as fp:
+def write_collection_seed_file(seed_col,station1):
+    if station1 is None:
+        file1 = 'collection_data_seed_inventory.csv.tmp'
+    else:
+        file1 = 'collection_data_seed_inventory.csv.{}.tmp'.format(station1)
+
+    with open(os.path.join(PREP_DIR, file1),'w', newline='\r\n') as fp:
         for key in seed_col:
             # P,urn:nasa:pds:apollo_pse:data_seed:xb.elyse.85.llz.2019.273.6::1.0
             line1 = 'P,{}{}\n'.format(key, seed_col[key])
             fp.write('P,{}{}\n'.format(key, seed_col[key]))
     return seed_col
 
-def write_collection_geocsv_file(geocsv_col):
-    with open(os.path.join(PREP_DIR, 'collection_data_table_inventory.csv.tmp'),'w', newline='\r\n') as fp:
+def write_collection_geocsv_file(geocsv_col,station1):
+    if station1 is None:
+        file1 = 'collection_data_table_inventory.csv.tmp'
+    else:
+        file1 = 'collection_data_table_inventory.csv.{}.tmp'.format(station1)
+
+    with open(os.path.join(PREP_DIR, file1),'w', newline='\r\n') as fp:
         for key in geocsv_col:
             # P,urn:nasa:pds:apollo_pse:data_table:xb.elyse.85.llz.2019.273.6.a::1.0
             line1 = 'P,{}{}\n'.format(key, geocsv_col[key])
@@ -1452,27 +1499,40 @@ def find_files(directory, pattern, unmatch_pattern=None, network='xa', waveform_
     if case == 'upper':
         waveform_type = waveform_type.upper()
         network = network.upper()
-    # print(os.path.join(directory,network,waveform_type))
     for station in sorted(os.listdir(os.path.join(directory,network,waveform_type))):
-        for year in sorted(os.listdir(os.path.join(directory,network,waveform_type,station))):
-            for julday in sorted(os.listdir(os.path.join(directory,network,waveform_type,station,year))):
-                for basename in sorted(os.listdir(os.path.join(directory,network,waveform_type,station,year,julday))):
-                    # pass
-                    if fnmatch.fnmatch(basename, pattern):
-                        if unmatch_pattern is not None:
-                            if not fnmatch.fnmatch(basename, unmatch_pattern):
-                                # print(os.path.join(directory,network,waveform_type,station,year,julday, basename))
-                                yield os.path.join(directory,network,waveform_type,station,year,julday), basename
-                        else:
-                            yield os.path.join(directory,network,waveform_type,station,year,julday), basename
+            directory1 = os.path.join(directory,network,waveform_type,station)
+            if os.path.isdir(directory1):
+                for year in sorted(os.listdir(directory1)):
+                    directory2  = os.path.join(directory,network,waveform_type,station,year)
+                    if os.path.isdir(directory2):
+                        for julday in sorted(os.listdir(directory2)):
+                            directory3  = os.path.join(directory,network,waveform_type,station,year,julday)
+                            if os.path.isdir(directory3):
+                                for basename in sorted(os.listdir(directory3)):
+                                    # pass
+                                    if fnmatch.fnmatch(basename, pattern):
+                                        if unmatch_pattern is not None:
+                                            if not fnmatch.fnmatch(basename, unmatch_pattern):
+                                                # print(os.path.join(directory,network,waveform_type,station,year,julday, basename))
+                                                yield os.path.join(directory,network,waveform_type,station,year,julday), basename
+                                        else:
+                                            yield os.path.join(directory,network,waveform_type,station,year,julday), basename
 
-def find_initial_files(directory, pattern, unmatch_pattern=None, network='xa', waveform_type='continuous_waveform', case='lower'):
+def find_initial_files(directory, pattern, unmatch_pattern=None, network='xa', waveform_type='continuous_waveform', case='lower', station1=None):
     # find the files which match a pattern
     if case == 'upper':
         waveform_type = waveform_type.upper()
         network = network.upper()
     # print(os.path.join(directory,network,waveform_type))
     for station in sorted(os.listdir(directory)):
+
+        # check the station exists and there are no extra directories
+        if station.upper() not in ('S11','S12','S14','S15','S16'):
+            continue
+        if station1 is not None and station1 != station:
+            continue
+        else:
+            print(station)    
         for year in sorted(os.listdir(os.path.join(directory,station))):
             for julday in sorted(os.listdir(os.path.join(directory,station,year))):
                 for basename in sorted(os.listdir(os.path.join(directory,station,year,julday))):
@@ -1698,14 +1758,18 @@ if __name__ == "__main__":
 
     # release '1' 
     release_number='1'
-    INPUT_DIR = '/Users/cnunn/lunar_data/PDART_ARCHIVE_TEST/'
+    # test dir 
+    # INPUT_DIR = '/Users/cnunn/lunar_data/PDART_ARCHIVE_TEST/'
     # to be replaced with:
-    # INPUT_DIR = '/Users/cnunn/lunar_data/PDART_V2/'
+    INPUT_DIR = '/Users/cnunn/lunar_data/PDART_V2/'
 
-    # note that this is a copy of the first version:
+    # this is a copy of the first version:
     # /Users/cnunn/lunar_data/pdart_pds_output_v1_sentOct.zip
-    # note that this is a copy of the second version:
+    # this is a copy of the second version:
     # /Users/cnunn/lunar_data/ARCHIVE/del_pdart_pds_output
+    # this is a copy of the test version that was accepted 
+    # /Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output_18_jul.zip
+
 
     OUTPUT_DIR = '/Users/cnunn/lunar_data/ARCHIVE/pdart_pds_output/data/'
 
