@@ -230,7 +230,7 @@ def remove_negative_ones_trace(trace):
     """
 
     if trace.stats.channel in ('MH1','MH2','MHZ','SHZ'):
-        trace.data = np.ma.masked_where(trace.data==-1, tr.data)
+        trace.data = np.ma.masked_where(trace.data==-1, trace.data)
     elif trace.stats.channel in ('ATT'):
         trace.data = np.ma.masked_values(trace.data,-1.0)
 
