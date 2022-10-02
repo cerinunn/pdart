@@ -200,7 +200,7 @@ def plot_examples():
       xycoords="axes fraction")
 
     plt.subplots_adjust(left=0.1, right=0.975, top=0.93, bottom=0.11)
-    plt.savefig('../extra_plots_output/moonquake_examples_MHZ_v2_XXXX.png', dpi=300)
+    plt.savefig('../extra_plots_output/moonquake_examples_MHZ.png', dpi=300)
     plt.show()
 
 def plot_deep():
