@@ -41,7 +41,6 @@ from obspy.core import Stream, read
 from pdart.extra_plots.plot_timing_divergence import plot_timing
 
 import matplotlib 
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 # from pdart.csv_check_work_tapes import (
 #   all_drop_duplicates,

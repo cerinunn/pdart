@@ -28,7 +28,6 @@ from obspy.core import Stream, Trace, Stats, read
 from obspy.core.utcdatetime import UTCDateTime
 
 import matplotlib  
-# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
 DELTA = 0.1509433962

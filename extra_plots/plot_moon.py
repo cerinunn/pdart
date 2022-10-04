@@ -13,7 +13,6 @@ Plot the Moon.
 #                         unicode_literals,absolute_import, division, print_function)
 # from future.builtins import *  # NOQA
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 def plot_moon(size='normal'):

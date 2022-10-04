@@ -69,12 +69,8 @@ from obspy.core import Stream, Trace, Stats, read
 import pdart.config as config
 from pdart.util import relative_timing_trace
 # from pdart.csv_import_work_tapes import find_output_dir, make_output_dir, make_filelist
-# import matplotlib.pyplot as plt
 
-# Qt5Agg seems to work best on Mac - try 'TkAgg' if that works for you
-# put this after the other imports, otherwise it can be overridden
 import matplotlib  
-# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
 from pdart.util import maximize_plot

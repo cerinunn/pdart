@@ -39,7 +39,6 @@ from pdart.util import remove_negative_ones
 
 
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 

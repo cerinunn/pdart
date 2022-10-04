@@ -34,12 +34,7 @@ import numpy as np
 from obspy.core.utcdatetime import UTCDateTime
 from obspy.core import Stream, read
 
-
-
-# Qt5Agg seems to work best on Mac - try 'TkAgg' if that works for you
-# put this after the other imports, otherwise it can be overridden
-import matplotlib  
-# matplotlib.use('Qt5Agg')
+import matplotlib
 from matplotlib import pyplot as plt
 import pdart.config as config
 import pdart.csv_join_work_tapes as csv_join_work_tapes

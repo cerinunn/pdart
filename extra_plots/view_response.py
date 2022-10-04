@@ -6,7 +6,6 @@ from time import *
 import numpy as np
 from obspy import *
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import os
 import glob

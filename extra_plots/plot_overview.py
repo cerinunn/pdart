@@ -8,7 +8,6 @@ Plot an overview
 from __future__ import print_function
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from obspy.core.utcdatetime import UTCDateTime

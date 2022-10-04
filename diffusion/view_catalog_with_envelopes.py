@@ -34,7 +34,6 @@ MOON_RADIUS = 1737 * 1000.
 MOON_FLATTENING = 1/825
 
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 

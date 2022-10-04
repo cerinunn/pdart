@@ -10,10 +10,7 @@ from __future__ import print_function
 import numpy as np
 import os
 
-# Qt5Agg seems to work best on Mac - try 'TkAgg' if that works for you
-# put this after the other imports, otherwise it can be overridden
-import matplotlib  
-# matplotlib.use('Qt5Agg')
+import matplotlib
 from matplotlib import pyplot as plt
 # 
 # from datetime import datetime, timedelta

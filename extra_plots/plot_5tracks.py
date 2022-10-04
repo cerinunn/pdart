@@ -8,10 +8,7 @@ Plot all the tracks (MH1, MH2, MHZ, SHZ, and the timing track ATT)
 
 from __future__ import print_function
 import numpy as np
-# Qt5Agg seems to work best on Mac - try 'TkAgg' if that works for you
-# put this after the other imports, otherwise it can be overridden
 import matplotlib  
-# matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 from datetime import datetime, timedelta
 from obspy.core.utcdatetime import UTCDateTime
